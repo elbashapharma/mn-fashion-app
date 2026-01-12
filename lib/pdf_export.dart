@@ -17,6 +17,16 @@ class PdfExporter {
     final confirmed = items.where((e) => e.status == ItemStatus.confirmed).toList();
     final total = confirmed.fold<double>(0, (p, e) => p + e.lineTotal);
 
+    // ✅ اقرأ كل الصور مسبقًا (بدل FutureBuilder)
+    final Map<int?, Uint8List> images = {};
+    for (final it in confirmed) {
+      try {
+        images[it.id] = await readBytes(it.imagePath);
+      } catch (_) {
+        // لو الصورة مش موجودة لأي سبب، سيبها null
+      }
+    }
+
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -31,7 +41,9 @@ class PdfExporter {
           pw.SizedBox(height: 12),
           pw.Divider(),
           pw.SizedBox(height: 6),
-          ...confirmed.map((it) => _itemBlock(it)),
+
+          ...confirmed.map((it) => _itemBlock(it, images[it.id])),
+
           pw.SizedBox(height: 12),
           pw.Divider(),
           pw.Align(
@@ -49,7 +61,7 @@ class PdfExporter {
     await Printing.sharePdf(bytes: bytes, filename: "order_${order.id}.pdf");
   }
 
-  static pw.Widget _itemBlock(OrderItem it) {
+  static pw.Widget _itemBlock(OrderItem it, Uint8List? imgBytes) {
     return pw.Container(
       margin: const pw.EdgeInsets.only(bottom: 12),
       padding: const pw.EdgeInsets.all(8),
@@ -63,13 +75,9 @@ class PdfExporter {
           pw.Container(
             width: 90,
             height: 90,
-            child: pw.FutureBuilder<Uint8List>(
-              future: readBytes(it.imagePath),
-              builder: (context, snap) {
-                if (snap.data == null) return pw.Container(color: PdfColors.grey200);
-                return pw.Image(pw.MemoryImage(snap.data!), fit: pw.BoxFit.cover);
-              },
-            ),
+            child: imgBytes == null
+                ? pw.Container(color: PdfColors.grey200)
+                : pw.Image(pw.MemoryImage(imgBytes), fit: pw.BoxFit.cover),
           ),
           pw.SizedBox(width: 10),
           pw.Expanded(
