@@ -38,7 +38,12 @@ class Repo {
 
   Future<List<OrderHeader>> listOrdersForCustomer(int customerId) async {
     final d = await AppDb.instance.db;
-    final rows = await d.query("orders", where: "customer_id=?", whereArgs: [customerId], orderBy: "id DESC");
+    final rows = await d.query(
+      "orders",
+      where: "customer_id=?",
+      whereArgs: [customerId],
+      orderBy: "id DESC",
+    );
     return rows.map(OrderHeader.fromMap).toList();
   }
 
@@ -71,7 +76,12 @@ class Repo {
 
   Future<List<OrderItem>> listItems(int orderId) async {
     final d = await AppDb.instance.db;
-    final rows = await d.query("items", where: "order_id=?", whereArgs: [orderId], orderBy: "id ASC");
+    final rows = await d.query(
+      "items",
+      where: "order_id=?",
+      whereArgs: [orderId],
+      orderBy: "id ASC",
+    );
     return rows.map(OrderItem.fromMap).toList();
   }
 }
