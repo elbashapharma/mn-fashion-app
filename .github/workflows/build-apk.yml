@@ -2,7 +2,7 @@ name: Build APK - M&N Fashion
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -16,21 +16,19 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: "temurin"
+          java-version: "17"
 
-           - name: Set up Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: "stable"
 
       - name: Create Android project (Android only)
-  run: flutter create --platforms=android --overwrite .
-
+        run: flutter create --platforms=android --overwrite .
 
       - name: Flutter Pub Get
         run: flutter pub get
-
 
       - name: Build APK
         run: flutter build apk --release
