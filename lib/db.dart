@@ -1,61 +1,23 @@
-import "dart:async";
-import "package:path/path.dart" as p;
-import "package:path_provider/path_provider.dart";
-import "package:sqflite/sqflite.dart";
+import 'package:flutter/material.dart';
+import 'screens/customers_screen.dart';
 
-class AppDb {
-  AppDb._();
-  static final AppDb instance = AppDb._();
-  Database? _db;
+void main() {
+  runApp(const MNFashionApp());
+}
 
-  Future<Database> get db async {
-    if (_db != null) return _db!;
-    _db = await _open();
-    return _db!;
-  }
+class MNFashionApp extends StatelessWidget {
+  const MNFashionApp({super.key});
 
-  Future<Database> _open() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final path = p.join(dir.path, "shein_pricing.db");
-    return openDatabase(
-      path,
-      version: 1,
-      onCreate: (database, version) async {
-        await database.execute("""
-          CREATE TABLE customers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            whatsapp TEXT
-          );
-        """);
-
-        await database.execute("""
-          CREATE TABLE orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            customer_id INTEGER NOT NULL,
-            created_at INTEGER NOT NULL,
-            default_rate REAL NOT NULL DEFAULT 0,
-            FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
-          );
-        """);
-
-        await database.execute("""
-          CREATE TABLE items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            order_id INTEGER NOT NULL,
-            image_path TEXT NOT NULL,
-            note TEXT,
-            price_sar REAL NOT NULL DEFAULT 0,
-            rate_egp REAL NOT NULL DEFAULT 0,
-            profit_egp REAL NOT NULL DEFAULT 0,
-            shipping TEXT NOT NULL DEFAULT 'air',
-            status TEXT NOT NULL DEFAULT 'pending',
-            size TEXT,
-            qty INTEGER,
-            FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE
-          );
-        """);
-      },
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'M&N Fashion',
+      theme: ThemeData(
+        primarySwatch: Colors.pink,
+        fontFamily: 'Arial',
+      ),
+      home: const CustomersScreen(),
     );
   }
 }
