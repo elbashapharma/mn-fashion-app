@@ -3,15 +3,15 @@ import "../models.dart";
 import "../repo.dart";
 import "order_detail_screen.dart";
 
-class الطلباتScreen extends StatefulWidget {
+class OrdersScreen extends StatefulWidget {
   final int customerId;
-  const الطلباتScreen({super.key, required this.customerId});
+  const OrdersScreen({super.key, required this.customerId});
 
   @override
-  State<الطلباتScreen> createState() => _الطلباتScreenState();
+  State<OrdersScreen> createState() => _OrdersScreenState();
 }
 
-class _الطلباتScreenState extends State<الطلباتScreen> {
+class _OrdersScreenState extends State<OrdersScreen> {
   Customer? customer;
   List<OrderHeader> orders = [];
 
@@ -23,7 +23,7 @@ class _الطلباتScreenState extends State<الطلباتScreen> {
 
   Future<void> _load() async {
     final c = await Repo.instance.getCustomer(widget.customerId);
-    final o = await Repo.instance.listالطلباتForCustomer(widget.customerId);
+    final o = await Repo.instance.listOrdersForCustomer(widget.customerId);
     setState(() {
       customer = c;
       orders = o;
@@ -42,7 +42,7 @@ class _الطلباتScreenState extends State<الطلباتScreen> {
           decoration: const InputDecoration(labelText: "سعر الريال الافتراضي (يمكن تغييره لكل منتج)"),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("إنشاء")),
         ],
       ),
@@ -69,8 +69,8 @@ class _الطلباتScreenState extends State<الطلباتScreen> {
         itemBuilder: (ctx, i) {
           final o = orders[i];
           return ListTile(
-            title: Text("Order #${o.id}"),
-            subtitle: Text("إنشاءd: ${o.createdAt}   | سعر الريال: ${o.defaultRate}"),
+            title: Text("طلب #${o.id}"),
+            subtitle: Text("تاريخ: ${o.createdAt}  |  سعر الريال: ${o.defaultRate}"),
             onTap: () async {
               await Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: o.id!)));
               await _load();
