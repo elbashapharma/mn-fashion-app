@@ -24,8 +24,18 @@ jobs:
         with:
           channel: "stable"
 
-      - name: Create Android project (Android only)
-        run: flutter create --platforms=android --overwrite .
+      # ✅ Create Android folder WITHOUT overwriting your lib/
+      - name: Generate Android folder
+        run: |
+          flutter create --platforms=android temp_app
+          rm -rf ./android
+          cp -r temp_app/android ./android
+          rm -rf temp_app
+
+      # Optional: set app display name
+      - name: Set Android app name
+        run: |
+          sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">M\&N Fashion<\/string>/' android/app/src/main/res/values/strings.xml
 
       - name: Flutter Pub Get
         run: flutter pub get
