@@ -3,16 +3,17 @@ import "../models.dart";
 import "../repo.dart";
 import "orders_screen.dart";
 
-class العملاءScreen extends StatefulWidget {
-  const العملاءScreen({super.key});
+class CustomersScreen extends StatefulWidget {
+  CustomersScreen({super.key});
 
   @override
-  State<العملاءScreen> createState() => _العملاءScreenState();
+  State<CustomersScreen> createState() => _CustomersScreenState();
 }
 
-class _العملاءScreenState extends State<العملاءScreen> {
+class _CustomersScreenState extends State<CustomersScreen> {
   List<Customer> customers = [];
   String q = "";
+  bool loading = true;
 
   @override
   void initState() {
@@ -21,22 +22,33 @@ class _العملاءScreenState extends State<العملاءScreen> {
   }
 
   Future<void> _load() async {
-    final list = await Repo.instance.listالعملاء();
-    setState(() => customers = list);
+    setState(() => loading = true);
+    final list = await Repo.instance.listCustomers();
+    setState(() {
+      customers = list;
+      loading = false;
+    });
   }
 
   Future<void> _addCustomer() async {
     final nameCtrl = TextEditingController();
     final waCtrl = TextEditingController();
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("إضافة عميل"),
+        title: const Text("إضافة زبون"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "اسم الزبون *")),
-            TextField(controller: waCtrl, decoration: const InputDecoration(labelText: "واتساب (اختياري)")),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: "اسم الزبون *"),
+            ),
+            TextField(
+              controller: waCtrl,
+              decoration: const InputDecoration(labelText: "رقم واتساب (اختياري)"),
+            ),
           ],
         ),
         actions: [
@@ -51,6 +63,7 @@ class _العملاءScreenState extends State<العملاءScreen> {
         ],
       ),
     );
+
     if (ok == true) {
       await Repo.instance.addCustomer(
         Customer(
@@ -66,14 +79,15 @@ class _العملاءScreenState extends State<العملاءScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("حذف العميل؟"),
-        content: Text("حذف ${c.name} وكل طلباته؟"),
+        title: const Text("حذف الزبون؟"),
+        content: Text("هل تريد حذف ${c.name} وكل طلباته؟"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("لا")),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("نعم")),
         ],
       ),
     );
+
     if (ok == true) {
       await Repo.instance.deleteCustomer(c.id!);
       await _load();
@@ -83,11 +97,13 @@ class _العملاءScreenState extends State<العملاءScreen> {
   @override
   Widget build(BuildContext context) {
     final filtered = customers.where((c) => c.name.toLowerCase().contains(q.toLowerCase())).toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("العملاء"),
         actions: [
           IconButton(onPressed: _addCustomer, icon: const Icon(Icons.person_add_alt_1)),
+          IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
       ),
       body: Column(
@@ -95,24 +111,38 @@ class _العملاءScreenState extends State<العملاءScreen> {
           Padding(
             padding: const EdgeInsets.all(12),
             child: TextField(
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: "بحث بالاسم"),
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: "بحث بالاسم",
+              ),
               onChanged: (v) => setState(() => q = v),
             ),
           ),
           Expanded(
-            child: ListView.separated(
-              itemCount: filtered.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (ctx, i) {
-                final c = filtered[i];
-                return ListTile(
-                  title: Text(c.name),
-                  subtitle: (c.whatsapp ?? "").trim().isEmpty ? null : Text("WhatsApp: ${c.whatsapp}"),
-                  trailing: IconButton(onPressed: () => _deleteCustomer(c), icon: const Icon(Icons.delete_outline)),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrdersScreen(customerId: c.id!))),
-                );
-              },
-            ),
+            child: loading
+                ? const Center(child: CircularProgressIndicator())
+                : filtered.isEmpty
+                    ? const Center(child: Text("لا يوجد عملاء"))
+                    : ListView.separated(
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (ctx, i) {
+                          final c = filtered[i];
+                          return ListTile(
+                            title: Text(c.name),
+                            subtitle: (c.whatsapp ?? "").trim().isEmpty ? null : Text("واتساب: ${c.whatsapp}"),
+                            leading: const Icon(Icons.person),
+                            trailing: IconButton(
+                              onPressed: () => _deleteCustomer(c),
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => OrdersScreen(customerId: c.id!)),
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
