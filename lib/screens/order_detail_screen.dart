@@ -55,7 +55,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Save")),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("حفظ")),
         ],
       ),
     );
@@ -116,7 +116,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("Order #${o.id} - ${c.name}"),
+        title: Text("طلب #${o.id} - ${c.name}"),
         actions: [
           IconButton(onPressed: _setDefaultRate, icon: const Icon(Icons.currency_exchange)),
           IconButton(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf)),
@@ -133,8 +133,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text("الزبون: ${c.name}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                    if ((c.whatsapp ?? "").trim().isNotEmpty) Text("WhatsApp: ${c.whatsapp}"),
-                    const المقاسdBox(height: 6),
+                    if ((c.whatsapp ?? "").trim().isNotEmpty) Text("واتساب: ${c.whatsapp}"),
+                    const SizedBox(height: 6),
                     Wrap(
                       spacing: 12,
                       runSpacing: 6,
@@ -144,12 +144,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         Chip(label: Text("ملغي: $cancelled")),
                       ],
                     ),
-                    const المقاسdBox(height: 6),
+                    const SizedBox(height: 6),
                     Text(
                       "إجمالي المؤكد: ${fmtMoney(_confirmedTotal())} ${AppConstants.currencyEgp}",
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    const المقاسdBox(height: 8),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
@@ -159,7 +159,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             label: const Text("إضافة صور"),
                           ),
                         ),
-                        const المقاسdBox(width: 10),
+                        const SizedBox(width: 10),
                         OutlinedButton.icon(
                           onPressed: _exportPdf,
                           icon: const Icon(Icons.share),
@@ -167,8 +167,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ),
                       ],
                     ),
-                    const المقاسdBox(height: 4),
-                    Text("Default rate for order: ${o.defaultRate}"),
+                    const SizedBox(height: 4),
+                    Text("سعر الريال الافتراضي: ${o.defaultRate}"),
                   ],
                 ),
               ),
@@ -176,7 +176,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
           Expanded(
             child: items.isEmpty
-                ? const Center(child: Text("No items yet. Tap 'إضافة صور'."))
+                ? const Center(child: Text("لا يوجد منتجات بعد. اضغط (إضافة صور)."))
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                     itemCount: items.length,
@@ -316,21 +316,21 @@ class _ItemCardState extends State<_ItemCard> {
                   borderRadius: BorderRadius.circular(8),
                   child: Image.file(File(widget.item.imagePath), width: 86, height: 86, fit: BoxFit.cover),
                 ),
-                const المقاسdBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text("منتج #${widget.item.id}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const المقاسdBox(height: 6),
+                      const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(color: statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(999)),
                         child: Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
                       ),
-                      const المقاسdBox(height: 6),
+                      const SizedBox(height: 6),
                       Text("سعر القطعة: ${fmtMoney(unit)} ${AppConstants.currencyEgp}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text("مدة الوصول: $days days"),
+                      Text("مدة الوصول: $days يوم"),
                     ],
                   ),
                 ),
@@ -340,13 +340,13 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
-            const المقاسdBox(height: 10),
+            const SizedBox(height: 10),
             TextField(
               controller: noteCtrl,
               decoration: const InputDecoration(labelText: "ملاحظة (اختياري) مثل اسم/وصف المنتج"),
               onChanged: (_) => setState(() {}),
             ),
-            const المقاسdBox(height: 10),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
@@ -357,7 +357,7 @@ class _ItemCardState extends State<_ItemCard> {
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
-                const المقاسdBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
                     controller: rateCtrl,
@@ -366,7 +366,7 @@ class _ItemCardState extends State<_ItemCard> {
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
-                const المقاسdBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
                     controller: profitCtrl,
@@ -377,7 +377,7 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
-            const المقاسdBox(height: 10),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
@@ -392,7 +392,7 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
-            const المقاسdBox(height: 10),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
@@ -406,7 +406,7 @@ class _ItemCardState extends State<_ItemCard> {
                     label: const Text("إرسال"),
                   ),
                 ),
-                const المقاسdBox(width: 10),
+                const SizedBox(width: 10),
                 OutlinedButton.icon(
                   onPressed: () async {
                     setState(() => status = ItemStatus.confirmed);
@@ -415,7 +415,7 @@ class _ItemCardState extends State<_ItemCard> {
                   icon: const Icon(Icons.check_circle_outline),
                   label: const Text("تأكيد"),
                 ),
-                const المقاسdBox(width: 10),
+                const SizedBox(width: 10),
                 OutlinedButton.icon(
                   onPressed: () async {
                     setState(() => status = ItemStatus.cancelled);
@@ -427,7 +427,7 @@ class _ItemCardState extends State<_ItemCard> {
               ],
             ),
             if (status == ItemStatus.confirmed) ...[
-              const المقاسdBox(height: 10),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
@@ -437,7 +437,7 @@ class _ItemCardState extends State<_ItemCard> {
                       onChanged: (_) => setState(() {}),
                     ),
                   ),
-                  const المقاسdBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
                       controller: qtyCtrl,
@@ -448,7 +448,7 @@ class _ItemCardState extends State<_ItemCard> {
                   ),
                 ],
               ),
-              const المقاسdBox(height: 8),
+              const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
