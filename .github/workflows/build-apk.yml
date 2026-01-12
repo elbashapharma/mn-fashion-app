@@ -24,8 +24,9 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Create Android project
-        run: flutter create .
+      - name: Create Android project (Android only)
+  run: flutter create --platforms=android --overwrite .
+
 
       - name: Flutter Pub Get
         run: flutter pub get
