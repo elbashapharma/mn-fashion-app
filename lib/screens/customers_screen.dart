@@ -1,22 +1,20 @@
 import "package:flutter/material.dart";
-import "../models.dart";
 import "../repo.dart";
+import "../models.dart";
 import "orders_screen.dart";
-import "debt_report_screen.dart";
+import "customer_finance_screen.dart";
 import "profit_report_screen.dart";
-import "dashboard_screen.dart";
 
 class CustomersScreen extends StatefulWidget {
-  CustomersScreen({super.key});
+  const CustomersScreen({super.key});
 
   @override
   State<CustomersScreen> createState() => _CustomersScreenState();
 }
 
 class _CustomersScreenState extends State<CustomersScreen> {
-  List<Customer> customers = [];
-  String q = "";
   bool loading = true;
+  List<Customer> customers = [];
 
   @override
   void initState() {
@@ -40,29 +38,37 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("إضافة زبون"),
+        title: const Text("إضافة عميل"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "اسم الزبون *")),
-            TextField(controller: waCtrl, decoration: const InputDecoration(labelText: "رقم واتساب (اختياري)")),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: "اسم العميل"),
+            ),
+            TextField(
+              controller: waCtrl,
+              decoration: const InputDecoration(labelText: "واتساب (اختياري)"),
+            ),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
-          FilledButton(
-            onPressed: () {
-              if (nameCtrl.text.trim().isEmpty) return;
-              Navigator.pop(ctx, true);
-            },
-            child: const Text("حفظ"),
-          ),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("حفظ")),
         ],
       ),
     );
 
     if (ok == true) {
-      await Repo.instance.addCustomer(Customer(name: nameCtrl.text.trim(), whatsapp: waCtrl.text.trim().isEmpty ? null : waCtrl.text.trim()));
+      final name = nameCtrl.text.trim();
+      if (name.isEmpty) return;
+
+      await Repo.instance.addCustomer(
+        Customer(
+          name: name,
+          whatsapp: waCtrl.text.trim().isEmpty ? null : waCtrl.text.trim(),
+        ),
+      );
       await _load();
     }
   }
@@ -71,14 +77,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("حذف الزبون؟"),
-        content: Text("هل تريد حذف ${c.name} وكل طلباته؟"),
+        title: const Text("حذف العميل"),
+        content: Text("تأكيد حذف العميل: ${c.name} ؟"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("لا")),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("نعم")),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("حذف")),
         ],
       ),
     );
+
     if (ok == true) {
       await Repo.instance.deleteCustomer(c.id!);
       await _load();
@@ -87,72 +94,79 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = customers.where((c) => c.name.toLowerCase().contains(q.toLowerCase())).toList();
-
     return Scaffold(
       appBar: AppBar(
-  title: const Text("العملاء"),
-  actions: [
-    IconButton(
-      icon: const Icon(Icons.bar_chart),
-      tooltip: "تقرير الأرباح",
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const ProfitReportScreen(),
-          ),
-        );
-      },
-    ),
-  ],
-),
-
+        title: const Text("العملاء"),
+        actions: [
+          // ✅ زر تقرير الأرباح
           IconButton(
-            tooltip: "مديونية العملاء",
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DebtReportScreen())),
-            icon: const Icon(Icons.account_balance_wallet),
+            icon: const Icon(Icons.bar_chart),
+            tooltip: "تقرير الأرباح",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfitReportScreen()),
+              );
+            },
           ),
-          IconButton(onPressed: _addCustomer, icon: const Icon(Icons.person_add_alt_1)),
-          IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: "بحث بالاسم"),
-              onChanged: (v) => setState(() => q = v),
-            ),
-          ),
-          Expanded(
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : filtered.isEmpty
-                    ? const Center(child: Text("لا يوجد عملاء"))
-                    : ListView.separated(
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (ctx, i) {
-                          final c = filtered[i];
-                          return ListTile(
-                            title: Text(c.name),
-                            subtitle: (c.whatsapp ?? "").trim().isNotEmpty ? Text("واتساب: ${c.whatsapp}") : null,
-                            leading: const Icon(Icons.person),
-                            trailing: IconButton(onPressed: () => _deleteCustomer(c), icon: const Icon(Icons.delete_outline)),
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrdersScreen(customerId: c.id!))),
-                          );
-                        },
-                      ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: "تحديث",
+            onPressed: _load,
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: _addCustomer,
-        icon: const Icon(Icons.add),
-        label: const Text("إضافة"),
+        child: const Icon(Icons.person_add),
       ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : customers.isEmpty
+              ? const Center(child: Text("لا يوجد عملاء بعد. اضغط + لإضافة عميل."))
+              : ListView.separated(
+                  itemCount: customers.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (ctx, i) {
+                    final c = customers[i];
+                    return ListTile(
+                      title: Text(c.name),
+                      subtitle: (c.whatsapp ?? "").trim().isEmpty ? null : Text("WhatsApp: ${c.whatsapp}"),
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (v) async {
+                          if (v == "orders") {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => OrdersScreen(customerId: c.id!)),
+                            );
+                            await _load();
+                          } else if (v == "finance") {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => CustomerFinanceScreen(customerId: c.id!)),
+                            );
+                            await _load();
+                          } else if (v == "delete") {
+                            await _deleteCustomer(c);
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: "orders", child: Text("الطلبات")),
+                          PopupMenuItem(value: "finance", child: Text("مالية العميل")),
+                          PopupMenuDivider(),
+                          PopupMenuItem(value: "delete", child: Text("حذف")),
+                        ],
+                      ),
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => OrdersScreen(customerId: c.id!)),
+                        );
+                        await _load();
+                      },
+                    );
+                  },
+                ),
     );
   }
 }
