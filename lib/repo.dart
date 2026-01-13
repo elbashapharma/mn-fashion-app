@@ -210,34 +210,34 @@ class Repo {
     return revenue - paid; // لو + يبقى عليه فلوس
   }
 
-  // ---------- Customer Statement Entries ----------
-  Future<List<Map<String, Object?>>> _deliveredOrdersForCustomer(int customerId) async {
-    final d = await AppDb.instance.db;
-    return d.rawQuery(
-      """
-      SELECT 
-        o.id AS order_id,
-        o.delivered_at AS delivered_at,
-        COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS amount
-      FROM orders o
-      LEFT JOIN items i ON i.order_id = o.id AND i.status='confirmed'
-      WHERE o.customer_id = ?
-        AND o.delivered_at IS NOT NULL
-      GROUP BY o.id, o.delivered_at
-      ORDER BY o.delivered_at ASC
-      """,
-      [customerId],
-    );
-  }
+ Future<List<Map<String, Object?>>> deliveredOrdersForCustomer(int customerId) async {
+  final d = await AppDb.instance.db;
+  return d.rawQuery(
+    """
+    SELECT 
+      o.id AS order_id,
+      o.delivered_at AS delivered_at,
+      COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS amount
+    FROM orders o
+    LEFT JOIN items i ON i.order_id = o.id AND i.status='confirmed'
+    WHERE o.customer_id = ?
+      AND o.delivered_at IS NOT NULL
+    GROUP BY o.id, o.delivered_at
+    ORDER BY o.delivered_at ASC
+    """,
+    [customerId],
+  );
+}
 
-  Future<List<Map<String, Object?>>> _paymentsForCustomer(int customerId) async {
-    final d = await AppDb.instance.db;
-    return d.query(
-      "payments",
-      where: "customer_id=?",
-      whereArgs: [customerId],
-      orderBy: "created_at ASC",
-    );
-  }
+Future<List<Map<String, Object?>>> paymentsForCustomer(int customerId) async {
+  final d = await AppDb.instance.db;
+  return d.query(
+    "payments",
+    where: "customer_id=?",
+    whereArgs: [customerId],
+    orderBy: "created_at ASC",
+  );
+}
+
 
 }
