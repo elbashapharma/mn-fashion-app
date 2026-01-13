@@ -20,7 +20,7 @@ class AppDb {
 
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (database, version) async {
         await database.execute("""
           CREATE TABLE customers (
@@ -71,13 +71,25 @@ class AppDb {
             FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
           );
         """);
+
+        // ✅ NEW: payments
+        await database.execute("""
+          CREATE TABLE payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER NOT NULL,
+            order_id INTEGER,
+            amount_egp REAL NOT NULL,
+            note TEXT,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+            FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE SET NULL
+          );
+        """);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
-          // add delivered_at
           await db.execute("ALTER TABLE orders ADD COLUMN delivered_at INTEGER;");
 
-          // add expenses table
           await db.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,6 +101,21 @@ class AppDb {
               created_at INTEGER NOT NULL,
               FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE,
               FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
+            );
+          """);
+        }
+
+        if (oldVersion < 3) {
+          await db.execute("""
+            CREATE TABLE IF NOT EXISTS payments (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              customer_id INTEGER NOT NULL,
+              order_id INTEGER,
+              amount_egp REAL NOT NULL,
+              note TEXT,
+              created_at INTEGER NOT NULL,
+              FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+              FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE SET NULL
             );
           """);
         }
