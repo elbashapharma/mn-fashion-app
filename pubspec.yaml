@@ -27,7 +27,6 @@ dependencies:
 
   # ✅ Arabic PDF support (THE ONLY VERSION THAT RESOLVES HERE)
   arabic_reshaper: ^0.0.1
-  bidi: ^2.0.10
 
 dev_dependencies:
   flutter_test:
