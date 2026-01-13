@@ -101,6 +101,10 @@ class OrderItem {
   double get unitSellEgp => (priceSar * rateEgp);
   double get unitCostEgp => (buyPriceSar * rateEgp);
 
+    // ✅ Backward compatible getters (for older screens/PDF)
+  double get unitPriceEgp => ((priceSar * rateEgp) + profitEgp);
+  double get lineTotal => unitPriceEgp * q;
+
   OrderItem copyWith({
     int? id,
     int? orderId,
