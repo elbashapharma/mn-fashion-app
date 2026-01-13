@@ -5,7 +5,7 @@ class Repo {
   Repo._();
   static final Repo instance = Repo._();
 
-  // ---------------- Customers ----------------
+  // ---------- Customers ----------
   Future<List<Customer>> listCustomers() async {
     final d = await AppDb.instance.db;
     final res = await d.query("customers", orderBy: "name ASC");
@@ -28,7 +28,7 @@ class Repo {
     await d.delete("customers", where: "id=?", whereArgs: [id]);
   }
 
-  // ---------------- Orders ----------------
+  // ---------- Orders ----------
   Future<int> createOrder(int customerId, double defaultRate) async {
     final d = await AppDb.instance.db;
     return d.insert("orders", {
@@ -58,34 +58,24 @@ class Repo {
 
   Future<void> updateOrderDefaultRate(int orderId, double rate) async {
     final d = await AppDb.instance.db;
-    await d.update(
-      "orders",
-      {"default_rate": rate},
-      where: "id=?",
-      whereArgs: [orderId],
-    );
+    await d.update("orders", {"default_rate": rate}, where: "id=?", whereArgs: [orderId]);
   }
 
-  // ✅ زر تم التسليم
-  Future<void> markOrderDelivered(int orderId, DateTime deliveredAt) async {
+  // ✅ زر التسليم
+  Future<void> markOrderDelivered(int orderId) async {
     final d = await AppDb.instance.db;
     await d.update(
       "orders",
-      {"delivered_at": deliveredAt.millisecondsSinceEpoch},
+      {"delivered_at": DateTime.now().millisecondsSinceEpoch},
       where: "id=?",
       whereArgs: [orderId],
     );
   }
 
-  // ---------------- Items ----------------
+  // ---------- Items ----------
   Future<List<OrderItem>> listItems(int orderId) async {
     final d = await AppDb.instance.db;
-    final res = await d.query(
-      "items",
-      where: "order_id=?",
-      whereArgs: [orderId],
-      orderBy: "id ASC",
-    );
+    final res = await d.query("items", where: "order_id=?", whereArgs: [orderId], orderBy: "id ASC");
     return res.map(OrderItem.fromMap).toList();
   }
 
@@ -96,12 +86,7 @@ class Repo {
 
   Future<void> updateItem(OrderItem it) async {
     final d = await AppDb.instance.db;
-    await d.update(
-      "items",
-      it.toMap(),
-      where: "id=?",
-      whereArgs: [it.id],
-    );
+    await d.update("items", it.toMap(), where: "id=?", whereArgs: [it.id]);
   }
 
   Future<void> deleteItem(int id) async {
@@ -109,12 +94,12 @@ class Repo {
     await d.delete("items", where: "id=?", whereArgs: [id]);
   }
 
-  // ---------------- Expenses ----------------
+  // ---------- Expenses ----------
   Future<int> addExpense({
     int? orderId,
     int? customerId,
     required double amountEgp,
-    required String type, // shipping / other
+    required String type,
     String? note,
     DateTime? date,
   }) async {
@@ -132,17 +117,13 @@ class Repo {
   Future<double> sumExpensesBetween(DateTime from, DateTime to) async {
     final d = await AppDb.instance.db;
     final res = await d.rawQuery(
-      """
-      SELECT COALESCE(SUM(amount_egp),0) AS total
-      FROM expenses
-      WHERE created_at BETWEEN ? AND ?
-      """,
+      "SELECT COALESCE(SUM(amount_egp),0) AS total FROM expenses WHERE created_at BETWEEN ? AND ?",
       [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
     );
     return (res.first["total"] as num).toDouble();
   }
 
-  // ---------------- Payments ----------------
+  // ---------- Payments ----------
   Future<int> addPayment({
     required int customerId,
     int? orderId,
@@ -160,6 +141,15 @@ class Repo {
     });
   }
 
+  Future<double> sumPaymentsBetween(DateTime from, DateTime to) async {
+    final d = await AppDb.instance.db;
+    final res = await d.rawQuery(
+      "SELECT COALESCE(SUM(amount_egp),0) AS total FROM payments WHERE created_at BETWEEN ? AND ?",
+      [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
+    );
+    return (res.first["total"] as num).toDouble();
+  }
+
   Future<double> sumPaymentsForCustomer(int customerId) async {
     final d = await AppDb.instance.db;
     final res = await d.rawQuery(
@@ -169,94 +159,120 @@ class Repo {
     return (res.first["total"] as num).toDouble();
   }
 
-  // ---------------- Revenue / Profit Between Dates ----------------
-  // ✅ Revenue based on SellSAR + ExtraProfit (confirmed items) for delivered orders within period
-  Future<double> sumRevenueBetween(DateTime from, DateTime to) async {
+  // ---------- Delivered Revenue/Cost ----------
+  Future<double> sumDeliveredRevenueBetween(DateTime from, DateTime to) async {
     final d = await AppDb.instance.db;
     final res = await d.rawQuery(
       """
-      SELECT COALESCE(SUM( ((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0) ),0) AS total
-      FROM items i
-      JOIN orders o ON o.id = i.order_id
-      WHERE i.status = 'confirmed'
-        AND o.delivered_at IS NOT NULL
-        AND o.delivered_at BETWEEN ? AND ?
+      SELECT COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS total
+      FROM items i JOIN orders o ON o.id=i.order_id
+      WHERE i.status='confirmed' AND o.delivered_at IS NOT NULL
+        AND o.created_at BETWEEN ? AND ?
       """,
       [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
     );
     return (res.first["total"] as num).toDouble();
   }
 
-  // ✅ Cost based on BuySAR for delivered orders within period
-  Future<double> sumCostBetween(DateTime from, DateTime to) async {
+  Future<double> sumDeliveredCostBetween(DateTime from, DateTime to) async {
     final d = await AppDb.instance.db;
     final res = await d.rawQuery(
       """
-      SELECT COALESCE(SUM( (i.buy_price_sar * i.rate_egp) * COALESCE(i.qty,0) ),0) AS total
-      FROM items i
-      JOIN orders o ON o.id = i.order_id
-      WHERE i.status = 'confirmed'
-        AND o.delivered_at IS NOT NULL
-        AND o.delivered_at BETWEEN ? AND ?
+      SELECT COALESCE(SUM((i.buy_price_sar * i.rate_egp) * COALESCE(i.qty,0)),0) AS total
+      FROM items i JOIN orders o ON o.id=i.order_id
+      WHERE i.status='confirmed' AND o.delivered_at IS NOT NULL
+        AND o.created_at BETWEEN ? AND ?
       """,
       [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
     );
     return (res.first["total"] as num).toDouble();
   }
 
-  // ---------------- Customer Balance ----------------
-  Future<double> sumRevenueForCustomerDelivered(int customerId) async {
+  // ---------- Customer Debt (Delivered Only) ----------
+  Future<List<Map<String, Object?>>> debtsDeliveredOnly() async {
     final d = await AppDb.instance.db;
-    final res = await d.rawQuery(
-      """
-      SELECT COALESCE(
-        SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),
-        0
-      ) AS total
-      FROM items i
-      JOIN orders o ON o.id = i.order_id
-      WHERE o.customer_id = ?
-        AND i.status = 'confirmed'
-        AND o.delivered_at IS NOT NULL
-      """,
-      [customerId],
-    );
-    return (res.first["total"] as num).toDouble();
-  }
 
-  Future<double> customerBalance(int customerId) async {
-    final revenue = await sumRevenueForCustomerDelivered(customerId);
-    final paid = await sumPaymentsForCustomer(customerId);
-    return revenue - paid;
-  }
-
-  // ---------------- Statement helpers ----------------
-  Future<List<Map<String, Object?>>> deliveredOrdersForCustomer(int customerId) async {
-    final d = await AppDb.instance.db;
-    return d.rawQuery(
-      """
-      SELECT 
-        o.id AS order_id,
-        o.delivered_at AS delivered_at,
-        COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS amount
+    final revRows = await d.rawQuery("""
+      SELECT o.customer_id AS customer_id,
+             COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS revenue
       FROM orders o
-      LEFT JOIN items i ON i.order_id = o.id AND i.status='confirmed'
-      WHERE o.customer_id = ?
-        AND o.delivered_at IS NOT NULL
-      GROUP BY o.id, o.delivered_at
-      ORDER BY o.delivered_at ASC
-      """,
-      [customerId],
-    );
+      LEFT JOIN items i ON i.order_id=o.id AND i.status='confirmed'
+      WHERE o.delivered_at IS NOT NULL
+      GROUP BY o.customer_id
+    """);
+
+    final payRows = await d.rawQuery("""
+      SELECT customer_id, COALESCE(SUM(amount_egp),0) AS paid
+      FROM payments
+      GROUP BY customer_id
+    """);
+
+    final paidMap = <int, double>{};
+    for (final r in payRows) {
+      paidMap[(r["customer_id"] as num).toInt()] = (r["paid"] as num).toDouble();
+    }
+
+    final out = <Map<String, Object?>>[];
+    for (final r in revRows) {
+      final cid = (r["customer_id"] as num).toInt();
+      final revenue = (r["revenue"] as num).toDouble();
+      final paid = paidMap[cid] ?? 0;
+      final bal = revenue - paid;
+      if (bal > 0.0001) {
+        out.add({"customer_id": cid, "revenue": revenue, "paid": paid, "balance": bal});
+      }
+    }
+    out.sort((a, b) => (b["balance"] as double).compareTo(a["balance"] as double));
+    return out;
   }
 
-  Future<List<Map<String, Object?>>> paymentsForCustomer(int customerId) async {
+  // ---------- Dashboard Summary ----------
+  Future<Map<String, Object>> ordersSummary(DateTime from, DateTime to) async {
     final d = await AppDb.instance.db;
-    return d.query(
-      "payments",
-      where: "customer_id=?",
-      whereArgs: [customerId],
-      orderBy: "created_at ASC",
+
+    Future<int> _count(String status) async {
+      final r = await d.rawQuery(
+        """
+        SELECT COALESCE(COUNT(*),0) AS cnt
+        FROM items i JOIN orders o ON o.id=i.order_id
+        WHERE i.status=? AND o.created_at BETWEEN ? AND ?
+        """,
+        [status, from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
+      );
+      return (r.first["cnt"] as num).toInt();
+    }
+
+    Future<double> _sum(String status) async {
+      final r = await d.rawQuery(
+        """
+        SELECT COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS total
+        FROM items i JOIN orders o ON o.id=i.order_id
+        WHERE i.status=? AND o.created_at BETWEEN ? AND ?
+        """,
+        [status, from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
+      );
+      return (r.first["total"] as num).toDouble();
+    }
+
+    final allOrders = await d.rawQuery(
+      "SELECT COALESCE(COUNT(*),0) AS cnt FROM orders WHERE created_at BETWEEN ? AND ?",
+      [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
     );
+
+    final deliveredOrders = await d.rawQuery(
+      "SELECT COALESCE(COUNT(*),0) AS cnt FROM orders WHERE delivered_at IS NOT NULL AND created_at BETWEEN ? AND ?",
+      [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
+    );
+
+    return {
+      "orders_all": (allOrders.first["cnt"] as num).toInt(),
+      "orders_delivered": (deliveredOrders.first["cnt"] as num).toInt(),
+      "pending_count": await _count("pending"),
+      "pending_total": await _sum("pending"),
+      "confirmed_count": await _count("confirmed"),
+      "confirmed_total": await _sum("confirmed"),
+      "cancelled_count": await _count("cancelled"),
+      "cancelled_total": await _sum("cancelled"),
+    };
   }
 }
