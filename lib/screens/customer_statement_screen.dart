@@ -12,8 +12,11 @@ class CustomerStatementScreen extends StatefulWidget {
 
 class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
   bool loading = true;
+  String customerName = "";
+  List<Map<String, Object?>> ledger = [];
 
-  List<_Row> rows = [];
+  double debit = 0;
+  double credit = 0;
   double balance = 0;
 
   @override
@@ -25,45 +28,40 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
   Future<void> _load() async {
     setState(() => loading = true);
 
-    final delivered = await Repo.instance.deliveredOrdersForCustomer(widget.customerId);
-    final pays = await Repo.instance.paymentsForCustomer(widget.customerId);
+    final c = await Repo.instance.getCustomer(widget.customerId);
+    final rows = await Repo.instance.customerLedger(widget.customerId);
 
-    final tmp = <_Row>[];
+    double d = 0;
+    double cr = 0;
 
-    for (final r in delivered) {
-      final dt = DateTime.fromMillisecondsSinceEpoch(r["delivered_at"] as int);
-      final amount = (r["amount"] as num).toDouble();
-      final orderId = r["order_id"] as int;
-      tmp.add(_Row(date: dt, title: "طلب مُسلّم #$orderId", debit: amount, credit: 0));
-    }
-
-    for (final p in pays) {
-      final dt = DateTime.fromMillisecondsSinceEpoch(p["created_at"] as int);
-      final amount = (p["amount_egp"] as num).toDouble();
-      final note = (p["note"] as String?) ?? "";
-      tmp.add(_Row(date: dt, title: note.trim().isEmpty ? "دفعة" : "دفعة: $note", debit: 0, credit: amount));
-    }
-
-    tmp.sort((a, b) => a.date.compareTo(b.date));
-
-    double running = 0;
-    for (final r in tmp) {
-      running += r.debit;
-      running -= r.credit;
-      r.runningBalance = running;
+    for (final r in rows) {
+      final type = r["type"] as String;
+      final amount = (r["amount"] as double);
+      if (type == "order") d += amount; else cr += amount;
     }
 
     setState(() {
-      rows = tmp;
-      balance = running;
+      customerName = c.name;
+      ledger = rows;
+      debit = d;
+      credit = cr;
+      balance = d - cr;
       loading = false;
     });
+  }
+
+  String _fmtDate(int ms) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
+    return "${dt.year}-${dt.month.toString().padLeft(2,'0')}-${dt.day.toString().padLeft(2,'0')}";
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("كشف حساب العميل")),
+      appBar: AppBar(
+        title: Text("كشف حساب: $customerName"),
+        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+      ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -73,34 +71,39 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
                   child: Card(
                     child: Padding(
                       padding: const EdgeInsets.all(12),
-                      child: Row(
+                      child: Column(
                         children: [
-                          const Expanded(child: Text("الرصيد الحالي", style: TextStyle(fontWeight: FontWeight.bold))),
-                          Text("${fmtMoney(balance)} EGP", style: const TextStyle(fontWeight: FontWeight.bold)),
+                          _row("إجمالي مدين (طلبات مُسلّمة)", debit),
+                          const SizedBox(height: 6),
+                          _row("إجمالي دائن (مدفوعات)", credit),
+                          const Divider(),
+                          _row("الرصيد", balance, bold: true),
                         ],
                       ),
                     ),
                   ),
                 ),
                 Expanded(
-                  child: rows.isEmpty
+                  child: ledger.isEmpty
                       ? const Center(child: Text("لا توجد حركات"))
                       : ListView.separated(
-                          itemCount: rows.length,
+                          itemCount: ledger.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (ctx, i) {
-                            final r = rows[i];
+                            final r = ledger[i];
+                            final type = r["type"] as String;
+                            final date = _fmtDate(r["created_at"] as int);
+                            final orderId = r["order_id"];
+                            final amount = (r["amount"] as double);
+                            final note = (r["note"] ?? "") as String;
+
+                            final isDebit = type == "order";
                             return ListTile(
-                              title: Text(r.title),
-                              subtitle: Text("${r.date.year}-${r.date.month}-${r.date.day}"),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text("مدين: ${fmtMoney(r.debit)}"),
-                                  Text("دائن: ${fmtMoney(r.credit)}"),
-                                  Text("رصيد: ${fmtMoney(r.runningBalance)}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                                ],
+                              title: Text(isDebit ? "أوردر مُسلّم #$orderId" : "دفعة ${orderId == null ? "(تحت الحساب)" : "على أوردر #$orderId"}"),
+                              subtitle: Text("$date  •  $note"),
+                              trailing: Text(
+                                "${isDebit ? "+" : "-"}${fmtMoney(amount)} EGP",
+                                style: TextStyle(fontWeight: FontWeight.bold, color: isDebit ? Colors.red : Colors.green),
                               ),
                             );
                           },
@@ -110,19 +113,13 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
             ),
     );
   }
-}
 
-class _Row {
-  final DateTime date;
-  final String title;
-  final double debit;
-  final double credit;
-  double runningBalance = 0;
-
-  _Row({
-    required this.date,
-    required this.title,
-    required this.debit,
-    required this.credit,
-  });
+  Widget _row(String t, double v, {bool bold = false}) {
+    return Row(
+      children: [
+        Expanded(child: Text(t, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600))),
+        Text("${fmtMoney(v)} EGP", style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600)),
+      ],
+    );
+  }
 }
