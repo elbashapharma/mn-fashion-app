@@ -3,6 +3,7 @@ import "../models.dart";
 import "../repo.dart";
 import "orders_screen.dart";
 import "debt_report_screen.dart";
+import "profit_report_screen.dart";
 import "dashboard_screen.dart";
 
 class CustomersScreen extends StatefulWidget {
@@ -90,13 +91,23 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("العملاء"),
-        actions: [
-          IconButton(
-            tooltip: "Dashboard",
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DashboardScreen())),
-            icon: const Icon(Icons.dashboard),
+  title: const Text("العملاء"),
+  actions: [
+    IconButton(
+      icon: const Icon(Icons.bar_chart),
+      tooltip: "تقرير الأرباح",
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const ProfitReportScreen(),
           ),
+        );
+      },
+    ),
+  ],
+),
+
           IconButton(
             tooltip: "مديونية العملاء",
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DebtReportScreen())),
