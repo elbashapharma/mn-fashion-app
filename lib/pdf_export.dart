@@ -4,7 +4,6 @@ import "package:pdf/pdf.dart";
 import "package:pdf/widgets.dart" as pw;
 import "package:printing/printing.dart";
 import "package:arabic_reshaper/arabic_reshaper.dart";
-import "package:bidi/bidi.dart" as bidi;
 
 import "models.dart";
 import "utils.dart";
@@ -21,7 +20,6 @@ class PdfExporter {
     // ✅ Load Cairo font
     final fontData = await rootBundle.load("assets/fonts/Cairo-Regular.ttf");
     final cairo = pw.Font.ttf(fontData);
-
     final theme = pw.ThemeData.withFont(base: cairo);
 
     final confirmed = items.where((e) => e.status == ItemStatus.confirmed).toList();
@@ -135,9 +133,10 @@ class PdfExporter {
     );
   }
 
-  // ✅ Arabic shaping + bidi
+  // ✅ Arabic shaping + (fallback RTL) without bidi package
   static String ar(String input) {
     final reshaped = ArabicReshaper().reshape(input);
-    return bidi.bidi(reshaped);
+    // fallback: reverse to make pdf render correctly in many cases
+    return reshaped.split("").reversed.join();
   }
 }
