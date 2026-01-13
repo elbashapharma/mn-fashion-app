@@ -147,9 +147,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         orderId: o.id!,
         imagePath: saved,
         note: null,
-        priceSar: 0,
+        buyPriceSar: 0, // ✅ NEW
+        priceSar: 0,    // Sell SAR
         rateEgp: o.defaultRate,
-        profitEgp: 0,
+        profitEgp: 0,   // extra profit per piece (EGP)
         shipping: ShippingType.air,
         status: ItemStatus.pending,
         size: null,
@@ -160,8 +161,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     await _load();
   }
 
-  double _confirmedTotal() {
-    return items.where((e) => e.status == ItemStatus.confirmed).fold<double>(0, (p, e) => p + e.lineTotal);
+  double _confirmedTotalRevenueEgp() {
+    // revenue based on SellSAR only (without extra profit), for confirmed items
+    return items
+        .where((e) => e.status == ItemStatus.confirmed)
+        .fold<double>(0, (p, e) => p + e.revenueEgp);
+  }
+
+  double _confirmedTotalGrossProfitEgp() {
+    return items
+        .where((e) => e.status == ItemStatus.confirmed)
+        .fold<double>(0, (p, e) => p + e.grossProfitEgp);
   }
 
   Future<void> _exportPdf() async {
@@ -182,6 +192,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final confirmed = items.where((e) => e.status == ItemStatus.confirmed).length;
     final cancelled = items.where((e) => e.status == ItemStatus.cancelled).length;
     final pending = items.where((e) => e.status == ItemStatus.pending).length;
+
+    final totalRevenue = _confirmedTotalRevenueEgp();
+    final totalGrossProfit = _confirmedTotalGrossProfitEgp();
 
     return Scaffold(
       appBar: AppBar(
@@ -215,11 +228,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         Chip(label: Text("ملغي: $cancelled")),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "إجمالي المؤكد: ${fmtMoney(_confirmedTotal())} ${AppConstants.currencyEgp}",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                    const SizedBox(height: 8),
+                    Text("إجمالي الإيرادات (مؤكد): ${fmtMoney(totalRevenue)} EGP",
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text("إجمالي الربح الإجمالي (مؤكد): ${fmtMoney(totalGrossProfit)} EGP",
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 6),
                     Text(
                       o.deliveredAt == null ? "الحالة: غير مُسلّم" : "الحالة: مُسلّم ✅",
@@ -294,9 +308,10 @@ class _ItemCard extends StatefulWidget {
 }
 
 class _ItemCardState extends State<_ItemCard> {
-  late TextEditingController sarCtrl;
+  late TextEditingController buySarCtrl;
+  late TextEditingController sellSarCtrl;
   late TextEditingController rateCtrl;
-  late TextEditingController profitCtrl;
+  late TextEditingController extraProfitCtrl;
   late TextEditingController noteCtrl;
   late TextEditingController sizeCtrl;
   late TextEditingController qtyCtrl;
@@ -308,21 +323,26 @@ class _ItemCardState extends State<_ItemCard> {
   void initState() {
     super.initState();
     final it = widget.item;
-    sarCtrl = TextEditingController(text: it.priceSar.toString());
+
+    buySarCtrl = TextEditingController(text: it.buyPriceSar.toString());
+    sellSarCtrl = TextEditingController(text: it.priceSar.toString());
     rateCtrl = TextEditingController(text: it.rateEgp.toString());
-    profitCtrl = TextEditingController(text: it.profitEgp.toString());
+    extraProfitCtrl = TextEditingController(text: it.profitEgp.toString());
+
     noteCtrl = TextEditingController(text: it.note ?? "");
     sizeCtrl = TextEditingController(text: it.size ?? "");
     qtyCtrl = TextEditingController(text: it.qty?.toString() ?? "");
+
     shipping = it.shipping;
     status = it.status;
   }
 
   @override
   void dispose() {
-    sarCtrl.dispose();
+    buySarCtrl.dispose();
+    sellSarCtrl.dispose();
     rateCtrl.dispose();
-    profitCtrl.dispose();
+    extraProfitCtrl.dispose();
     noteCtrl.dispose();
     sizeCtrl.dispose();
     qtyCtrl.dispose();
@@ -336,9 +356,10 @@ class _ItemCardState extends State<_ItemCard> {
     final it = widget.item;
     return it.copyWith(
       note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
-      priceSar: _d(sarCtrl.text),
+      buyPriceSar: _d(buySarCtrl.text),
+      priceSar: _d(sellSarCtrl.text),
       rateEgp: _d(rateCtrl.text),
-      profitEgp: _d(profitCtrl.text),
+      profitEgp: _d(extraProfitCtrl.text),
       shipping: shipping,
       status: status,
       size: (status == ItemStatus.confirmed && sizeCtrl.text.trim().isNotEmpty) ? sizeCtrl.text.trim() : null,
@@ -348,11 +369,14 @@ class _ItemCardState extends State<_ItemCard> {
 
   String _buildMessage(OrderItem it) {
     final name = widget.customer.name;
-    final unit = fmtMoney(it.unitPriceEgp);
     final ship = it.shipping == ShippingType.air ? "جوي" : "بري";
     final days = it.shipping == ShippingType.air ? AppConstants.shippingDaysAir : AppConstants.shippingDaysLand;
+
+    // سعر البيع للقطعة بالجنيه = SellSAR*Rate + ExtraProfit
+    final unitSell = (it.priceSar * it.rateEgp) + it.profitEgp;
+
     return "أ/ $name\n"
-        "سعر القطعة: $unit جنيه\n"
+        "سعر القطعة: ${fmtMoney(unitSell)} جنيه\n"
         "الشحن: $ship — الوصول خلال $days يوم\n"
         "لو مناسب ابعت: المقاس + الكمية ✅";
   }
@@ -360,8 +384,13 @@ class _ItemCardState extends State<_ItemCard> {
   @override
   Widget build(BuildContext context) {
     final it = _currentItem();
-    final unit = it.unitPriceEgp;
-    final days = shipping == ShippingType.air ? AppConstants.shippingDaysAir : AppConstants.shippingDaysLand;
+
+    final unitSell = (it.priceSar * it.rateEgp) + it.profitEgp;
+    final unitCost = (it.buyPriceSar * it.rateEgp);
+
+    final revenue = it.revenueEgp;
+    final cost = it.costEgp;
+    final gross = it.grossProfitEgp;
 
     Color statusColor;
     String statusText;
@@ -378,6 +407,8 @@ class _ItemCardState extends State<_ItemCard> {
         statusColor = Colors.orange;
         statusText = "معلق";
     }
+
+    final days = shipping == ShippingType.air ? AppConstants.shippingDaysAir : AppConstants.shippingDaysLand;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -401,14 +432,12 @@ class _ItemCardState extends State<_ItemCard> {
                       const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
+                        decoration: BoxDecoration(color: statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(999)),
                         child: Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
                       ),
                       const SizedBox(height: 6),
-                      Text("سعر القطعة: ${fmtMoney(unit)} ${AppConstants.currencyEgp}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text("بيع/قطعة: ${fmtMoney(unitSell)} EGP", style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text("شراء/قطعة: ${fmtMoney(unitCost)} EGP"),
                       Text("مدة الوصول: $days يوم"),
                     ],
                   ),
@@ -420,23 +449,39 @@ class _ItemCardState extends State<_ItemCard> {
               ],
             ),
             const SizedBox(height: 10),
+
             TextField(
               controller: noteCtrl,
               decoration: const InputDecoration(labelText: "ملاحظة (اختياري) مثل اسم/وصف المنتج"),
               onChanged: (_) => setState(() {}),
             ),
+
             const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
                   child: TextField(
-                    controller: sarCtrl,
+                    controller: buySarCtrl,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: "سعر البيع بالريال"),
+                    decoration: const InputDecoration(labelText: "سعر الشراء بالريال (Buy SAR)"),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
                 const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: sellSarCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: "سعر البيع بالريال (Sell SAR)"),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+            Row(
+              children: [
                 Expanded(
                   child: TextField(
                     controller: rateCtrl,
@@ -448,7 +493,7 @@ class _ItemCardState extends State<_ItemCard> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
-                    controller: profitCtrl,
+                    controller: extraProfitCtrl,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(labelText: "ربح إضافي/قطعة (جنيه)"),
                     onChanged: (_) => setState(() {}),
@@ -456,6 +501,7 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
+
             const SizedBox(height: 10),
             Row(
               children: [
@@ -471,6 +517,7 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
+
             const SizedBox(height: 10),
             Row(
               children: [
@@ -505,6 +552,7 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
+
             if (status == ItemStatus.confirmed) ...[
               const SizedBox(height: 10),
               Row(
@@ -527,12 +575,19 @@ class _ItemCardState extends State<_ItemCard> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  "إجمالي الصنف: ${fmtMoney(it.lineTotal)} ${AppConstants.currencyEgp}",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+              const SizedBox(height: 10),
+              Card(
+                color: Colors.grey.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("إيراد الصنف: ${fmtMoney(revenue)} EGP"),
+                      Text("تكلفة الصنف: ${fmtMoney(cost)} EGP"),
+                      Text("الربح الإجمالي: ${fmtMoney(gross)} EGP", style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ),
               ),
             ],
