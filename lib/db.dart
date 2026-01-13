@@ -20,7 +20,7 @@ class AppDb {
 
     return openDatabase(
       path,
-      version: 5,
+      version: 6, // ✅ زودنا نسخة الداتا عشان cash_txns
       onCreate: (database, version) async {
         await database.execute("""
           CREATE TABLE customers (
@@ -73,7 +73,6 @@ class AppDb {
           );
         """);
 
-        // ✅ PAYMENTS
         await database.execute("""
           CREATE TABLE payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,6 +83,19 @@ class AppDb {
             created_at INTEGER NOT NULL,
             FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE,
             FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE SET NULL
+          );
+        """);
+
+        // ✅ Cash Drawer (opening + all movements)
+        await database.execute("""
+          CREATE TABLE cash_txns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            amount_egp REAL NOT NULL,
+            note TEXT,
+            customer_id INTEGER,
+            order_id INTEGER
           );
         """);
       },
@@ -111,7 +123,7 @@ class AppDb {
           );
         """);
 
-        // ✅ payments
+        // payments
         await db.execute("""
           CREATE TABLE IF NOT EXISTS payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,6 +132,19 @@ class AppDb {
             amount_egp REAL NOT NULL,
             note TEXT,
             created_at INTEGER NOT NULL
+          );
+        """);
+
+        // ✅ cash_txns
+        await db.execute("""
+          CREATE TABLE IF NOT EXISTS cash_txns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            amount_egp REAL NOT NULL,
+            note TEXT,
+            customer_id INTEGER,
+            order_id INTEGER
           );
         """);
       },
