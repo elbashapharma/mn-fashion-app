@@ -147,5 +147,97 @@ class Repo {
     );
     return (res.first["total"] as num).toDouble();
   }
+  // ---------- Payments ----------
+  Future<int> addPayment({
+    required int customerId,
+    int? orderId,
+    required double amountEgp,
+    String? note,
+    DateTime? date,
+  }) async {
+    final d = await AppDb.instance.db;
+    return d.insert("payments", {
+      "customer_id": customerId,
+      "order_id": orderId,
+      "amount_egp": amountEgp,
+      "note": note,
+      "created_at": (date ?? DateTime.now()).millisecondsSinceEpoch,
+    });
+  }
+
+  Future<double> sumPaymentsBetween(DateTime from, DateTime to) async {
+    final d = await AppDb.instance.db;
+    final res = await d.rawQuery(
+      """
+      SELECT COALESCE(SUM(amount_egp),0) AS total
+      FROM payments
+      WHERE created_at BETWEEN ? AND ?
+      """,
+      [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
+    );
+    return (res.first["total"] as num).toDouble();
+  }
+
+  Future<double> sumPaymentsForCustomer(int customerId) async {
+    final d = await AppDb.instance.db;
+    final res = await d.rawQuery(
+      "SELECT COALESCE(SUM(amount_egp),0) AS total FROM payments WHERE customer_id=?",
+      [customerId],
+    );
+    return (res.first["total"] as num).toDouble();
+  }
+
+  // ---------- Revenue: delivered orders only ----------
+  Future<double> sumRevenueForCustomerDelivered(int customerId) async {
+    final d = await AppDb.instance.db;
+    final res = await d.rawQuery(
+      """
+      SELECT COALESCE(SUM( ((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0) ),0) AS total
+      FROM items i
+      JOIN orders o ON o.id = i.order_id
+      WHERE o.customer_id = ?
+        AND i.status = 'confirmed'
+        AND o.delivered_at IS NOT NULL
+      """,
+      [customerId],
+    );
+    return (res.first["total"] as num).toDouble();
+  }
+
+  Future<double> customerBalance(int customerId) async {
+    final revenue = await sumRevenueForCustomerDelivered(customerId);
+    final paid = await sumPaymentsForCustomer(customerId);
+    return revenue - paid; // لو + يبقى عليه فلوس
+  }
+
+  // ---------- Customer Statement Entries ----------
+  Future<List<Map<String, Object?>>> _deliveredOrdersForCustomer(int customerId) async {
+    final d = await AppDb.instance.db;
+    return d.rawQuery(
+      """
+      SELECT 
+        o.id AS order_id,
+        o.delivered_at AS delivered_at,
+        COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS amount
+      FROM orders o
+      LEFT JOIN items i ON i.order_id = o.id AND i.status='confirmed'
+      WHERE o.customer_id = ?
+        AND o.delivered_at IS NOT NULL
+      GROUP BY o.id, o.delivered_at
+      ORDER BY o.delivered_at ASC
+      """,
+      [customerId],
+    );
+  }
+
+  Future<List<Map<String, Object?>>> _paymentsForCustomer(int customerId) async {
+    final d = await AppDb.instance.db;
+    return d.query(
+      "payments",
+      where: "customer_id=?",
+      whereArgs: [customerId],
+      orderBy: "created_at ASC",
+    );
+  }
 
 }
