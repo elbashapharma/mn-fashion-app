@@ -366,4 +366,76 @@ class Repo {
   }
 
   }
+    // =========================
+  // Customer delivered revenue (for Finance screen)
+  // =========================
+  Future<double> sumRevenueForCustomerDelivered(int customerId) async {
+    final d = await AppDb.instance.db;
+    final res = await d.rawQuery("""
+      SELECT COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS total
+      FROM items i
+      JOIN orders o ON o.id = i.order_id
+      WHERE o.customer_id = ?
+        AND o.delivered_at IS NOT NULL
+        AND i.status = 'confirmed'
+    """, [customerId]);
+
+    return (res.first["total"] as num).toDouble();
+  }
+
+  // =========================
+  // Customer ledger (statement)
+  // orders delivered => DEBIT
+  // payments => CREDIT (order_id may be null = تحت الحساب)
+  // =========================
+  Future<List<Map<String, Object?>>> customerLedger(int customerId) async {
+    final d = await AppDb.instance.db;
+
+    final orders = await d.rawQuery("""
+      SELECT 
+        o.created_at AS created_at,
+        o.id AS order_id,
+        COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS amount
+      FROM orders o
+      LEFT JOIN items i ON i.order_id=o.id AND i.status='confirmed'
+      WHERE o.customer_id=? AND o.delivered_at IS NOT NULL
+      GROUP BY o.id
+    """, [customerId]);
+
+    final pays = await d.rawQuery("""
+      SELECT 
+        created_at AS created_at,
+        order_id AS order_id,
+        amount_egp AS amount,
+        note AS note
+      FROM payments
+      WHERE customer_id=?
+    """, [customerId]);
+
+    final out = <Map<String, Object?>>[];
+
+    for (final r in orders) {
+      out.add({
+        "type": "order",
+        "created_at": r["created_at"],
+        "order_id": r["order_id"],
+        "amount": (r["amount"] as num).toDouble(),
+        "note": "أوردر مُسلّم",
+      });
+    }
+
+    for (final r in pays) {
+      out.add({
+        "type": "payment",
+        "created_at": r["created_at"],
+        "order_id": r["order_id"],
+        "amount": (r["amount"] as num).toDouble(),
+        "note": r["note"],
+      });
+    }
+
+    out.sort((a, b) => (a["created_at"] as int).compareTo(b["created_at"] as int));
+    return out;
+  }
+
 }
