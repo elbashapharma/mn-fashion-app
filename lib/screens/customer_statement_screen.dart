@@ -25,8 +25,8 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
   Future<void> _load() async {
     setState(() => loading = true);
 
-    final delivered = await Repo.instance._deliveredOrdersForCustomer(widget.customerId);
-    final pays = await Repo.instance._paymentsForCustomer(widget.customerId);
+    final delivered = await Repo.instance.deliveredOrdersForCustomer(widget.customerId);
+    final pays = await Repo.instance.paymentsForCustomer(widget.customerId);
 
     final tmp = <_Row>[];
 
