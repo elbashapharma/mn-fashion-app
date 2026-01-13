@@ -2,9 +2,8 @@ import "package:flutter/material.dart";
 import "../models.dart";
 import "../repo.dart";
 import "orders_screen.dart";
-import "profit_report_screen.dart";
 import "debt_report_screen.dart";
-import "customer_finance_screen.dart";
+import "dashboard_screen.dart";
 
 class CustomersScreen extends StatefulWidget {
   CustomersScreen({super.key});
@@ -44,14 +43,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: "اسم الزبون *"),
-            ),
-            TextField(
-              controller: waCtrl,
-              decoration: const InputDecoration(labelText: "رقم واتساب (اختياري)"),
-            ),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "اسم الزبون *")),
+            TextField(controller: waCtrl, decoration: const InputDecoration(labelText: "رقم واتساب (اختياري)")),
           ],
         ),
         actions: [
@@ -68,12 +61,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
 
     if (ok == true) {
-      await Repo.instance.addCustomer(
-        Customer(
-          name: nameCtrl.text.trim(),
-          whatsapp: waCtrl.text.trim().isEmpty ? null : waCtrl.text.trim(),
-        ),
-      );
+      await Repo.instance.addCustomer(Customer(name: nameCtrl.text.trim(), whatsapp: waCtrl.text.trim().isEmpty ? null : waCtrl.text.trim()));
       await _load();
     }
   }
@@ -90,7 +78,6 @@ class _CustomersScreenState extends State<CustomersScreen> {
         ],
       ),
     );
-
     if (ok == true) {
       await Repo.instance.deleteCustomer(c.id!);
       await _load();
@@ -105,26 +92,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
       appBar: AppBar(
         title: const Text("العملاء"),
         actions: [
-          // 📊 تقرير الأرباح العام
           IconButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfitReportScreen()),
-            ),
-            icon: const Icon(Icons.bar_chart),
-            tooltip: "تقرير الأرباح",
+            tooltip: "Dashboard",
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DashboardScreen())),
+            icon: const Icon(Icons.dashboard),
           ),
-
-          // 💼 مديونية العملاء
           IconButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DebtReportScreen()),
-            ),
-            icon: const Icon(Icons.account_balance_wallet),
             tooltip: "مديونية العملاء",
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DebtReportScreen())),
+            icon: const Icon(Icons.account_balance_wallet),
           ),
-
           IconButton(onPressed: _addCustomer, icon: const Icon(Icons.person_add_alt_1)),
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
@@ -134,10 +111,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           Padding(
             padding: const EdgeInsets.all(12),
             child: TextField(
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                hintText: "بحث بالاسم",
-              ),
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: "بحث بالاسم"),
               onChanged: (v) => setState(() => q = v),
             ),
           ),
@@ -153,24 +127,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           final c = filtered[i];
                           return ListTile(
                             title: Text(c.name),
-                            subtitle: (c.whatsapp ?? "").trim().isEmpty ? null : Text("واتساب: ${c.whatsapp}"),
+                            subtitle: (c.whatsapp ?? "").trim().isNotEmpty ? Text("واتساب: ${c.whatsapp}") : null,
                             leading: const Icon(Icons.person),
-                            trailing: IconButton(
-                              onPressed: () => _deleteCustomer(c),
-                              icon: const Icon(Icons.delete_outline),
-                            ),
-
-                            // ضغط عادي: يفتح الطلبات
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => OrdersScreen(customerId: c.id!)),
-                            ),
-
-                            // ضغط مطوّل: يفتح مالية العميل (دفعات + كشف حساب)
-                            onLongPress: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => CustomerFinanceScreen(customerId: c.id!)),
-                            ),
+                            trailing: IconButton(onPressed: () => _deleteCustomer(c), icon: const Icon(Icons.delete_outline)),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrdersScreen(customerId: c.id!))),
                           );
                         },
                       ),
