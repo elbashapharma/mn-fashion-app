@@ -20,7 +20,7 @@ class AppDb {
 
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: (database, version) async {
         await database.execute("""
           CREATE TABLE customers (
@@ -47,13 +47,18 @@ class AppDb {
             order_id INTEGER NOT NULL,
             image_path TEXT NOT NULL,
             note TEXT,
-            price_sar REAL NOT NULL DEFAULT 0,
+
+            buy_price_sar REAL NOT NULL DEFAULT 0,   -- ✅ NEW
+            price_sar REAL NOT NULL DEFAULT 0,       -- Sell SAR
+
             rate_egp REAL NOT NULL DEFAULT 0,
-            profit_egp REAL NOT NULL DEFAULT 0,
+            profit_egp REAL NOT NULL DEFAULT 0,      -- extra profit per piece (EGP)
+
             shipping TEXT NOT NULL DEFAULT 'air',
             status TEXT NOT NULL DEFAULT 'pending',
             size TEXT,
             qty INTEGER,
+
             FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE
           );
         """);
@@ -72,7 +77,6 @@ class AppDb {
           );
         """);
 
-        // ✅ NEW: payments
         await database.execute("""
           CREATE TABLE payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,7 +93,6 @@ class AppDb {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute("ALTER TABLE orders ADD COLUMN delivered_at INTEGER;");
-
           await db.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,9 +101,7 @@ class AppDb {
               amount_egp REAL NOT NULL,
               type TEXT NOT NULL,
               note TEXT,
-              created_at INTEGER NOT NULL,
-              FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE,
-              FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
+              created_at INTEGER NOT NULL
             );
           """);
         }
@@ -113,11 +114,13 @@ class AppDb {
               order_id INTEGER,
               amount_egp REAL NOT NULL,
               note TEXT,
-              created_at INTEGER NOT NULL,
-              FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE,
-              FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE SET NULL
+              created_at INTEGER NOT NULL
             );
           """);
+        }
+
+        if (oldVersion < 4) {
+          await db.execute("ALTER TABLE items ADD COLUMN buy_price_sar REAL NOT NULL DEFAULT 0;");
         }
       },
     );
