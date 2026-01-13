@@ -72,7 +72,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final o = order;
     if (o == null) return;
 
-    await Repo.instance.markOrderDelivered(o.id!, DateTime.now());
+    await Repo.instance.markOrderDelivered(o.id!);
     await _load();
 
     if (mounted) {
