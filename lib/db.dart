@@ -20,7 +20,7 @@ class AppDb {
 
     return openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: (database, version) async {
         await database.execute("""
           CREATE TABLE customers (
@@ -47,18 +47,14 @@ class AppDb {
             order_id INTEGER NOT NULL,
             image_path TEXT NOT NULL,
             note TEXT,
-
             buy_price_sar REAL NOT NULL DEFAULT 0,
             price_sar REAL NOT NULL DEFAULT 0,
-
             rate_egp REAL NOT NULL DEFAULT 0,
             profit_egp REAL NOT NULL DEFAULT 0,
-
             shipping TEXT NOT NULL DEFAULT 'air',
             status TEXT NOT NULL DEFAULT 'pending',
             size TEXT,
             qty INTEGER,
-
             FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE
           );
         """);
@@ -77,6 +73,7 @@ class AppDb {
           );
         """);
 
+        // ✅ PAYMENTS
         await database.execute("""
           CREATE TABLE payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,37 +88,40 @@ class AppDb {
         """);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
+        // delivered_at
+        try {
           await db.execute("ALTER TABLE orders ADD COLUMN delivered_at INTEGER;");
-          await db.execute("""
-            CREATE TABLE IF NOT EXISTS expenses (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              order_id INTEGER,
-              customer_id INTEGER,
-              amount_egp REAL NOT NULL,
-              type TEXT NOT NULL,
-              note TEXT,
-              created_at INTEGER NOT NULL
-            );
-          """);
-        }
+        } catch (_) {}
 
-        if (oldVersion < 3) {
-          await db.execute("""
-            CREATE TABLE IF NOT EXISTS payments (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              customer_id INTEGER NOT NULL,
-              order_id INTEGER,
-              amount_egp REAL NOT NULL,
-              note TEXT,
-              created_at INTEGER NOT NULL
-            );
-          """);
-        }
-
-        if (oldVersion < 4) {
+        // buy_price_sar
+        try {
           await db.execute("ALTER TABLE items ADD COLUMN buy_price_sar REAL NOT NULL DEFAULT 0;");
-        }
+        } catch (_) {}
+
+        // expenses
+        await db.execute("""
+          CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER,
+            customer_id INTEGER,
+            amount_egp REAL NOT NULL,
+            type TEXT NOT NULL,
+            note TEXT,
+            created_at INTEGER NOT NULL
+          );
+        """);
+
+        // ✅ payments
+        await db.execute("""
+          CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER NOT NULL,
+            order_id INTEGER,
+            amount_egp REAL NOT NULL,
+            note TEXT,
+            created_at INTEGER NOT NULL
+          );
+        """);
       },
     );
   }
