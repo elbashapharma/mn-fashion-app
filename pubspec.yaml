@@ -8,9 +8,6 @@ environment:
   sdk: ">=3.2.0 <4.0.0"
 
 dependencies:
-  sqflite: ^2.3.0
-  path: ^1.9.0
-
   flutter:
     sdk: flutter
 
@@ -19,6 +16,10 @@ dependencies:
   # Images & files
   image_picker: ^1.0.7
   path_provider: ^2.1.2
+  path: ^1.9.0
+
+  # Local DB
+  sqflite: ^2.3.0
 
   # Share & formatting
   share_plus: ^7.2.2
@@ -28,7 +29,7 @@ dependencies:
   pdf: ^3.10.7
   printing: ^5.12.0
 
-  # ✅ Arabic PDF support (THE ONLY VERSION THAT RESOLVES HERE)
+  # Arabic PDF support (works in your runner)
   arabic_reshaper: ^0.0.1
 
 dev_dependencies:
