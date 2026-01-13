@@ -29,6 +29,16 @@ class Repo {
   }
 
   // ---------------- Orders ----------------
+  Future<int> createOrder(int customerId, double defaultRate) async {
+    final d = await AppDb.instance.db;
+    return d.insert("orders", {
+      "customer_id": customerId,
+      "created_at": DateTime.now().millisecondsSinceEpoch,
+      "default_rate": defaultRate,
+      "delivered_at": null,
+    });
+  }
+
   Future<List<OrderHeader>> listOrdersForCustomer(int customerId) async {
     final d = await AppDb.instance.db;
     final res = await d.query(
@@ -44,11 +54,6 @@ class Repo {
     final d = await AppDb.instance.db;
     final res = await d.query("orders", where: "id=?", whereArgs: [id]);
     return OrderHeader.fromMap(res.first);
-  }
-
-  Future<int> addOrder(OrderHeader o) async {
-    final d = await AppDb.instance.db;
-    return d.insert("orders", o.toMap());
   }
 
   Future<void> updateOrderDefaultRate(int orderId, double rate) async {
@@ -164,20 +169,42 @@ class Repo {
     return (res.first["total"] as num).toDouble();
   }
 
-  Future<double> sumPaymentsBetween(DateTime from, DateTime to) async {
+  // ---------------- Revenue / Profit Between Dates ----------------
+  // ✅ Revenue based on SellSAR + ExtraProfit (confirmed items) for delivered orders within period
+  Future<double> sumRevenueBetween(DateTime from, DateTime to) async {
     final d = await AppDb.instance.db;
     final res = await d.rawQuery(
       """
-      SELECT COALESCE(SUM(amount_egp),0) AS total
-      FROM payments
-      WHERE created_at BETWEEN ? AND ?
+      SELECT COALESCE(SUM( ((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0) ),0) AS total
+      FROM items i
+      JOIN orders o ON o.id = i.order_id
+      WHERE i.status = 'confirmed'
+        AND o.delivered_at IS NOT NULL
+        AND o.delivered_at BETWEEN ? AND ?
       """,
       [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
     );
     return (res.first["total"] as num).toDouble();
   }
 
-  // ---------------- Revenue / Balance ----------------
+  // ✅ Cost based on BuySAR for delivered orders within period
+  Future<double> sumCostBetween(DateTime from, DateTime to) async {
+    final d = await AppDb.instance.db;
+    final res = await d.rawQuery(
+      """
+      SELECT COALESCE(SUM( (i.buy_price_sar * i.rate_egp) * COALESCE(i.qty,0) ),0) AS total
+      FROM items i
+      JOIN orders o ON o.id = i.order_id
+      WHERE i.status = 'confirmed'
+        AND o.delivered_at IS NOT NULL
+        AND o.delivered_at BETWEEN ? AND ?
+      """,
+      [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
+    );
+    return (res.first["total"] as num).toDouble();
+  }
+
+  // ---------------- Customer Balance ----------------
   Future<double> sumRevenueForCustomerDelivered(int customerId) async {
     final d = await AppDb.instance.db;
     final res = await d.rawQuery(
