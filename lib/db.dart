@@ -17,9 +17,10 @@ class AppDb {
   Future<Database> _open() async {
     final dir = await getApplicationDocumentsDirectory();
     final path = p.join(dir.path, "shein_pricing.db");
+
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (database, version) async {
         await database.execute("""
           CREATE TABLE customers (
@@ -35,6 +36,7 @@ class AppDb {
             customer_id INTEGER NOT NULL,
             created_at INTEGER NOT NULL,
             default_rate REAL NOT NULL DEFAULT 0,
+            delivered_at INTEGER,
             FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
           );
         """);
@@ -55,6 +57,41 @@ class AppDb {
             FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE
           );
         """);
+
+        await database.execute("""
+          CREATE TABLE expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER,
+            customer_id INTEGER,
+            amount_egp REAL NOT NULL,
+            type TEXT NOT NULL,
+            note TEXT,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE,
+            FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
+          );
+        """);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          // add delivered_at
+          await db.execute("ALTER TABLE orders ADD COLUMN delivered_at INTEGER;");
+
+          // add expenses table
+          await db.execute("""
+            CREATE TABLE IF NOT EXISTS expenses (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              order_id INTEGER,
+              customer_id INTEGER,
+              amount_egp REAL NOT NULL,
+              type TEXT NOT NULL,
+              note TEXT,
+              created_at INTEGER NOT NULL,
+              FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE,
+              FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
+            );
+          """);
+        }
       },
     );
   }
