@@ -48,11 +48,11 @@ class AppDb {
             image_path TEXT NOT NULL,
             note TEXT,
 
-            buy_price_sar REAL NOT NULL DEFAULT 0,   -- ✅ NEW
-            price_sar REAL NOT NULL DEFAULT 0,       -- Sell SAR
+            buy_price_sar REAL NOT NULL DEFAULT 0,
+            price_sar REAL NOT NULL DEFAULT 0,
 
             rate_egp REAL NOT NULL DEFAULT 0,
-            profit_egp REAL NOT NULL DEFAULT 0,      -- extra profit per piece (EGP)
+            profit_egp REAL NOT NULL DEFAULT 0,
 
             shipping TEXT NOT NULL DEFAULT 'air',
             status TEXT NOT NULL DEFAULT 'pending',
