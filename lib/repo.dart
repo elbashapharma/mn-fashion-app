@@ -437,5 +437,46 @@ class Repo {
     out.sort((a, b) => (a["created_at"] as int).compareTo(b["created_at"] as int));
     return out;
   }
+  // =========================
+  // Cash Drawer
+  // =========================
+  Future<int> addCashTxn({
+    required String type, // opening, customer_payment, supplier_purchase, shipping_expense, expense, profit_distribution
+    required double amountEgp, // + دخل, - صرف
+    String? note,
+    int? customerId,
+    int? orderId,
+    DateTime? date,
+  }) async {
+    final d = await AppDb.instance.db;
+    return d.insert("cash_txns", {
+      "created_at": (date ?? DateTime.now()).millisecondsSinceEpoch,
+      "type": type,
+      "amount_egp": amountEgp,
+      "note": note,
+      "customer_id": customerId,
+      "order_id": orderId,
+    });
+  }
+
+  Future<double> cashBalance() async {
+    final d = await AppDb.instance.db;
+    final res = await d.rawQuery("SELECT COALESCE(SUM(amount_egp),0) AS total FROM cash_txns");
+    return (res.first["total"] as num).toDouble();
+  }
+
+  Future<List<Map<String, Object?>>> listCashTxns({int limit = 200}) async {
+    final d = await AppDb.instance.db;
+    return d.query("cash_txns", orderBy: "created_at DESC", limit: limit);
+  }
+
+  Future<double> cashSumBetween(DateTime from, DateTime to) async {
+    final d = await AppDb.instance.db;
+    final res = await d.rawQuery(
+      "SELECT COALESCE(SUM(amount_egp),0) AS total FROM cash_txns WHERE created_at BETWEEN ? AND ?",
+      [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
+    );
+    return (res.first["total"] as num).toDouble();
+  }
 
 }
