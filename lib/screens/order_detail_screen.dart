@@ -135,6 +135,59 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
+  // ✅ NEW: تحصيل على نفس الأوردر
+  Future<void> _collectPaymentForOrder() async {
+    final c = customer;
+    final o = order;
+    if (c == null || o == null) return;
+
+    final amountCtrl = TextEditingController();
+    final noteCtrl = TextEditingController(text: "تحصيل على أوردر #${o.id}");
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("تحصيل على الأوردر"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: "المبلغ بالجنيه"),
+            ),
+            TextField(
+              controller: noteCtrl,
+              decoration: const InputDecoration(labelText: "ملاحظة (اختياري)"),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("حفظ")),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+      if (amount <= 0) return;
+
+      await Repo.instance.addPayment(
+        customerId: c.id!,
+        orderId: o.id!, // ✅ مرتبط بالأوردر
+        amountEgp: amount,
+        note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("تم تسجيل التحصيل ✅")),
+        );
+      }
+    }
+  }
+
   Future<void> _addImages() async {
     final List<XFile> picked = await picker.pickMultiImage();
     if (picked.isEmpty) return;
@@ -147,10 +200,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         orderId: o.id!,
         imagePath: saved,
         note: null,
-        buyPriceSar: 0, // ✅ NEW
-        priceSar: 0,    // Sell SAR
+        buyPriceSar: 0,
+        priceSar: 0,
         rateEgp: o.defaultRate,
-        profitEgp: 0,   // extra profit per piece (EGP)
+        profitEgp: 0,
         shipping: ShippingType.air,
         status: ItemStatus.pending,
         size: null,
@@ -162,16 +215,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   double _confirmedTotalRevenueEgp() {
-    // revenue based on SellSAR only (without extra profit), for confirmed items
-    return items
-        .where((e) => e.status == ItemStatus.confirmed)
-        .fold<double>(0, (p, e) => p + e.revenueEgp);
+    return items.where((e) => e.status == ItemStatus.confirmed).fold<double>(0, (p, e) => p + e.revenueEgp);
   }
 
   double _confirmedTotalGrossProfitEgp() {
-    return items
-        .where((e) => e.status == ItemStatus.confirmed)
-        .fold<double>(0, (p, e) => p + e.grossProfitEgp);
+    return items.where((e) => e.status == ItemStatus.confirmed).fold<double>(0, (p, e) => p + e.grossProfitEgp);
   }
 
   Future<void> _exportPdf() async {
@@ -202,6 +250,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         actions: [
           IconButton(onPressed: _setDefaultRate, icon: const Icon(Icons.currency_exchange), tooltip: "سعر الريال"),
           IconButton(onPressed: _addShippingExpense, icon: const Icon(Icons.local_shipping_outlined), tooltip: "مصروف شحن"),
+          IconButton(onPressed: _collectPaymentForOrder, icon: const Icon(Icons.payments), tooltip: "تحصيل"),
           IconButton(onPressed: _markDelivered, icon: const Icon(Icons.check_circle_outline), tooltip: "تم التسليم"),
           IconButton(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf), tooltip: "PDF"),
         ],
@@ -229,11 +278,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text("إجمالي الإيرادات (مؤكد): ${fmtMoney(totalRevenue)} EGP",
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      "إجمالي الإيرادات (مؤكد): ${fmtMoney(totalRevenue)} EGP",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 4),
-                    Text("إجمالي الربح الإجمالي (مؤكد): ${fmtMoney(totalGrossProfit)} EGP",
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      "إجمالي الربح الإجمالي (مؤكد): ${fmtMoney(totalGrossProfit)} EGP",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       o.deliveredAt == null ? "الحالة: غير مُسلّم" : "الحالة: مُسلّم ✅",
@@ -372,7 +425,6 @@ class _ItemCardState extends State<_ItemCard> {
     final ship = it.shipping == ShippingType.air ? "جوي" : "بري";
     final days = it.shipping == ShippingType.air ? AppConstants.shippingDaysAir : AppConstants.shippingDaysLand;
 
-    // سعر البيع للقطعة بالجنيه = SellSAR*Rate + ExtraProfit
     final unitSell = (it.priceSar * it.rateEgp) + it.profitEgp;
 
     return "أ/ $name\n"
@@ -449,13 +501,11 @@ class _ItemCardState extends State<_ItemCard> {
               ],
             ),
             const SizedBox(height: 10),
-
             TextField(
               controller: noteCtrl,
               decoration: const InputDecoration(labelText: "ملاحظة (اختياري) مثل اسم/وصف المنتج"),
               onChanged: (_) => setState(() {}),
             ),
-
             const SizedBox(height: 10),
             Row(
               children: [
@@ -478,7 +528,6 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
-
             const SizedBox(height: 10),
             Row(
               children: [
@@ -501,7 +550,6 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
-
             const SizedBox(height: 10),
             Row(
               children: [
@@ -517,7 +565,6 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
-
             const SizedBox(height: 10),
             Row(
               children: [
@@ -552,7 +599,6 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
-
             if (status == ItemStatus.confirmed) ...[
               const SizedBox(height: 10),
               Row(
