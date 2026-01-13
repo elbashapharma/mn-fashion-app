@@ -44,6 +44,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final o = order;
     if (o == null) return;
     final ctrl = TextEditingController(text: o.defaultRate.toString());
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -59,10 +60,78 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     );
+
     if (ok == true) {
       final v = double.tryParse(ctrl.text.trim()) ?? 0;
       await Repo.instance.updateOrderDefaultRate(o.id!, v);
       await _load();
+    }
+  }
+
+  Future<void> _markDelivered() async {
+    final o = order;
+    if (o == null) return;
+
+    await Repo.instance.markOrderDelivered(o.id!, DateTime.now());
+    await _load();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("تم تسجيل الطلب كمُسلّم ✅")),
+      );
+    }
+  }
+
+  Future<void> _addShippingExpense() async {
+    final c = customer;
+    final o = order;
+    if (c == null || o == null) return;
+
+    final amountCtrl = TextEditingController();
+    final noteCtrl = TextEditingController(text: "شحن");
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("إضافة مصروف شحن"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: "المبلغ بالجنيه"),
+            ),
+            TextField(
+              controller: noteCtrl,
+              decoration: const InputDecoration(labelText: "ملاحظة (اختياري)"),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("حفظ")),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+      if (amount <= 0) return;
+
+      await Repo.instance.addExpense(
+        orderId: o.id,
+        customerId: c.id,
+        amountEgp: amount,
+        type: "shipping",
+        note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("تم إضافة مصروف الشحن ✅")),
+        );
+      }
     }
   }
 
@@ -118,8 +187,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       appBar: AppBar(
         title: Text("طلب #${o.id} - ${c.name}"),
         actions: [
-          IconButton(onPressed: _setDefaultRate, icon: const Icon(Icons.currency_exchange)),
-          IconButton(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf)),
+          IconButton(onPressed: _setDefaultRate, icon: const Icon(Icons.currency_exchange), tooltip: "سعر الريال"),
+          IconButton(onPressed: _addShippingExpense, icon: const Icon(Icons.local_shipping_outlined), tooltip: "مصروف شحن"),
+          IconButton(onPressed: _markDelivered, icon: const Icon(Icons.check_circle_outline), tooltip: "تم التسليم"),
+          IconButton(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf), tooltip: "PDF"),
         ],
       ),
       body: Column(
@@ -147,6 +218,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     const SizedBox(height: 6),
                     Text(
                       "إجمالي المؤكد: ${fmtMoney(_confirmedTotal())} ${AppConstants.currencyEgp}",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      o.deliveredAt == null ? "الحالة: غير مُسلّم" : "الحالة: مُسلّم ✅",
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
@@ -325,7 +401,10 @@ class _ItemCardState extends State<_ItemCard> {
                       const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(color: statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(999)),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
                         child: Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
                       ),
                       const SizedBox(height: 6),
@@ -353,7 +432,7 @@ class _ItemCardState extends State<_ItemCard> {
                   child: TextField(
                     controller: sarCtrl,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: "سعر بالريال"),
+                    decoration: const InputDecoration(labelText: "سعر البيع بالريال"),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
@@ -371,7 +450,7 @@ class _ItemCardState extends State<_ItemCard> {
                   child: TextField(
                     controller: profitCtrl,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: "الربح بالجنيه"),
+                    decoration: const InputDecoration(labelText: "ربح إضافي/قطعة (جنيه)"),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
