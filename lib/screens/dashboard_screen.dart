@@ -15,22 +15,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool loading = true;
 
-  int ordersAll = 0;
-  int ordersDelivered = 0;
-
+  // orders status summary
   int pendingCount = 0;
-  double pendingTotal = 0;
-
   int confirmedCount = 0;
-  double confirmedTotal = 0;
-
   int cancelledCount = 0;
+  int deliveredOrders = 0;
+
+  double pendingTotal = 0;
+  double confirmedTotal = 0;
   double cancelledTotal = 0;
 
-  double deliveredRevenue = 0;
-  double deliveredCost = 0;
+  // money
+  double cash = 0;
+  double supplierNeed = 0;
+
+  double revenueDelivered = 0;
+  double costDelivered = 0;
   double expenses = 0;
-  double collected = 0;
+  double payments = 0;
 
   @override
   void initState() {
@@ -57,7 +59,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _load() async {
     setState(() => loading = true);
 
-    final s = await Repo.instance.ordersSummary(from, to);
+    // لازم تكون عندك موجودة أو أضفتها قبل كده
+    final summary = await Repo.instance.ordersSummary(from, to);
+
+    final cashBal = await Repo.instance.cashBalance();
+    final need = await Repo.instance.sumConfirmedCostAllOpenOrders();
 
     final rev = await Repo.instance.sumDeliveredRevenueBetween(from, to);
     final cost = await Repo.instance.sumDeliveredCostBetween(from, to);
@@ -65,36 +71,160 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final pay = await Repo.instance.sumPaymentsBetween(from, to);
 
     setState(() {
-      ordersAll = s["orders_all"] as int;
-      ordersDelivered = s["orders_delivered"] as int;
+      pendingCount = summary["pending_count"] as int;
+      confirmedCount = summary["confirmed_count"] as int;
+      cancelledCount = summary["cancelled_count"] as int;
 
-      pendingCount = s["pending_count"] as int;
-      pendingTotal = s["pending_total"] as double;
+      pendingTotal = summary["pending_total"] as double;
+      confirmedTotal = summary["confirmed_total"] as double;
+      cancelledTotal = summary["cancelled_total"] as double;
 
-      confirmedCount = s["confirmed_count"] as int;
-      confirmedTotal = s["confirmed_total"] as double;
+      deliveredOrders = summary["orders_delivered"] as int;
 
-      cancelledCount = s["cancelled_count"] as int;
-      cancelledTotal = s["cancelled_total"] as double;
+      cash = cashBal;
+      supplierNeed = need;
 
-      deliveredRevenue = rev;
-      deliveredCost = cost;
+      revenueDelivered = rev;
+      costDelivered = cost;
       expenses = exp;
-      collected = pay;
+      payments = pay;
 
       loading = false;
     });
   }
 
+  double get grossProfit => revenueDelivered - costDelivered;
+  double get netProfit => grossProfit - expenses;
+
+  Future<void> _openingBalance() async {
+    final amountCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("رصيد أول مدة (الدرج)"),
+        content: TextField(
+          controller: amountCtrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(labelText: "المبلغ بالجنيه"),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("حفظ")),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      final v = double.tryParse(amountCtrl.text.trim()) ?? 0;
+      if (v <= 0) return;
+      await Repo.instance.addCashTxn(type: "opening", amountEgp: v, note: "رصيد أول مدة");
+      await _load();
+    }
+  }
+
+  Future<void> _paySupplier() async {
+    // دفع للمورد = خصم من الدرج
+    final amount = supplierNeed;
+
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("لا يوجد مؤكد بتكلفة للشراء")));
+      return;
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("دفع للمورد"),
+        content: Text("سيتم تسجيل دفع للمورد بقيمة:\n${fmtMoney(amount)} EGP"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("تأكيد")),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      await Repo.instance.addCashTxn(
+        type: "supplier_purchase",
+        amountEgp: -amount,
+        note: "دفع للمورد (إجمالي تكلفة المؤكد)",
+      );
+      await _load();
+    }
+  }
+
+  Future<void> _addGeneralExpense() async {
+    final amountCtrl = TextEditingController();
+    final noteCtrl = TextEditingController(text: "مصروف");
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("إضافة مصروف"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: "المبلغ بالجنيه"),
+            ),
+            TextField(
+              controller: noteCtrl,
+              decoration: const InputDecoration(labelText: "ملاحظة"),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("حفظ")),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      final v = double.tryParse(amountCtrl.text.trim()) ?? 0;
+      if (v <= 0) return;
+      await Repo.instance.addCashTxn(type: "expense", amountEgp: -v, note: noteCtrl.text.trim());
+      // ده غير expenses table (مصروفات الطلبات)، ده مصروفات عامة
+      await _load();
+    }
+  }
+
+  Future<void> _withdrawProfit() async {
+    final amountCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("توزيع/سحب أرباح"),
+        content: TextField(
+          controller: amountCtrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(labelText: "المبلغ بالجنيه"),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("حفظ")),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      final v = double.tryParse(amountCtrl.text.trim()) ?? 0;
+      if (v <= 0) return;
+      await Repo.instance.addCashTxn(type: "profit_distribution", amountEgp: -v, note: "سحب أرباح");
+      await _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final grossProfit = deliveredRevenue - deliveredCost;
-    final netProfit = grossProfit - expenses;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Dashboard"),
-        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+        actions: [
+          IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -107,36 +237,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(child: OutlinedButton(onPressed: _pickTo, child: Text("إلى: ${to.year}-${to.month}-${to.day}"))),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             if (loading) const LinearProgressIndicator(),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
             Expanded(
               child: ListView(
                 children: [
-                  _kpi("عدد الطلبات", ordersAll.toDouble(), isInt: true),
-                  _kpi("عدد الطلبات المُسلّمة", ordersDelivered.toDouble(), isInt: true),
+                  _card("رصيد الدرج الحالي", cash, bold: true),
+                  _card("مطلوب دفعه للمورد (تكلفة المؤكد)", supplierNeed, bold: true),
 
-                  const SizedBox(height: 10),
-                  _title("حالات المنتجات"),
-                  _kpi("عدد المعلّق", pendingCount.toDouble(), isInt: true),
-                  _kpi("إجمالي المعلّق", pendingTotal),
-                  _kpi("عدد المؤكد", confirmedCount.toDouble(), isInt: true),
-                  _kpi("إجمالي المؤكد", confirmedTotal),
-                  _kpi("عدد الملغي", cancelledCount.toDouble(), isInt: true),
-                  _kpi("إجمالي الملغي", cancelledTotal),
+                  const SizedBox(height: 8),
+                  _sectionTitle("الطلبات"),
+                  _small("معلّق: $pendingCount — إجمالي: ${fmtMoney(pendingTotal)}"),
+                  _small("مؤكد: $confirmedCount — إجمالي: ${fmtMoney(confirmedTotal)}"),
+                  _small("ملغي: $cancelledCount — إجمالي: ${fmtMoney(cancelledTotal)}"),
+                  _small("طلبات مُسلّمة: $deliveredOrders"),
 
-                  const SizedBox(height: 10),
-                  _title("المُسلّم (الحسابات الفعلية)"),
-                  _kpi("إيرادات (Revenue)", deliveredRevenue, bold: true),
-                  _kpi("تكلفة شراء (COGS)", deliveredCost),
-                  _kpi("ربح إجمالي (Gross)", grossProfit, bold: true),
-                  _kpi("مصروفات (شحن وغيره)", expenses),
-                  _kpi("صافي ربح (Net)", netProfit, bold: true),
+                  const SizedBox(height: 8),
+                  _sectionTitle("التحصيل والمصروفات (داخل المدة)"),
+                  _card("تحصيل العملاء", payments),
+                  _card("مصروفات (شحن/غيره على الطلبات)", expenses),
 
-                  const SizedBox(height: 10),
-                  _title("التحصيل"),
-                  _kpi("إجمالي التحصيل", collected, bold: true),
+                  const SizedBox(height: 8),
+                  _sectionTitle("الربحية (طلبات مُسلّمة داخل المدة)"),
+                  _card("إيرادات", revenueDelivered),
+                  _card("تكلفة شراء", costDelivered),
+                  _card("ربح إجمالي", grossProfit, bold: true),
+                  _card("صافي الربح", netProfit, bold: true),
+
+                  const SizedBox(height: 12),
+                  _sectionTitle("حركات سريعة"),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      FilledButton.icon(onPressed: _openingBalance, icon: const Icon(Icons.account_balance_wallet), label: const Text("رصيد أول مدة")),
+                      FilledButton.icon(onPressed: _paySupplier, icon: const Icon(Icons.store), label: const Text("دفع للمورد")),
+                      OutlinedButton.icon(onPressed: _addGeneralExpense, icon: const Icon(Icons.receipt_long), label: const Text("مصروف عام")),
+                      OutlinedButton.icon(onPressed: _withdrawProfit, icon: const Icon(Icons.savings), label: const Text("سحب أرباح")),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -146,20 +287,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _title(String t) => Padding(
+  Widget _sectionTitle(String t) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Text(t, style: const TextStyle(fontWeight: FontWeight.bold)),
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: Text(t, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        ),
       );
 
-  Widget _kpi(String title, double value, {bool bold = false, bool isInt = false}) {
-    final txt = isInt ? value.toInt().toString() : "${fmtMoney(value)} EGP";
+  Widget _small(String t) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Align(alignment: Alignment.centerRight, child: Text(t)),
+      );
+
+  Widget _card(String title, double value, {bool bold = false}) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
             Expanded(child: Text(title, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600))),
-            Text(txt, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600)),
+            Text("${fmtMoney(value)} EGP", style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600)),
           ],
         ),
       ),
