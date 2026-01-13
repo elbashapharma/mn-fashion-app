@@ -27,13 +27,23 @@ class OrderHeader {
   final DateTime createdAt;
   final double defaultRate;
 
-  OrderHeader({this.id, required this.customerId, required this.createdAt, required this.defaultRate});
+  // ✅ NEW
+  final DateTime? deliveredAt;
+
+  OrderHeader({
+    this.id,
+    required this.customerId,
+    required this.createdAt,
+    required this.defaultRate,
+    this.deliveredAt,
+  });
 
   Map<String, Object?> toMap() => {
         "id": id,
         "customer_id": customerId,
         "created_at": createdAt.millisecondsSinceEpoch,
         "default_rate": defaultRate,
+        "delivered_at": deliveredAt?.millisecondsSinceEpoch,
       };
 
   static OrderHeader fromMap(Map<String, Object?> m) => OrderHeader(
@@ -41,6 +51,9 @@ class OrderHeader {
         customerId: m["customer_id"] as int,
         createdAt: DateTime.fromMillisecondsSinceEpoch(m["created_at"] as int),
         defaultRate: (m["default_rate"] as num).toDouble(),
+        deliveredAt: (m["delivered_at"] == null)
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(m["delivered_at"] as int),
       );
 }
 
@@ -51,9 +64,9 @@ class OrderItem {
   final String imagePath;
   final String? note;
 
-  final double priceSar;
+  final double priceSar; // Sell SAR (سعر البيع بالريال)
   final double rateEgp;
-  final double profitEgp;
+  final double profitEgp; // الربح الإضافي بالجنيه (لكل قطعة)
 
   final ShippingType shipping;
   final ItemStatus status;
@@ -120,6 +133,7 @@ class OrderItem {
       };
 
   static ShippingType _shipFrom(String s) => s == "land" ? ShippingType.land : ShippingType.air;
+
   static ItemStatus _statusFrom(String s) {
     switch (s) {
       case "confirmed":
