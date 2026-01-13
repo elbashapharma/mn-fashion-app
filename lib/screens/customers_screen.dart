@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "../models.dart";
 import "../repo.dart";
 import "orders_screen.dart";
+import "profit_report_screen.dart";
 
 class CustomersScreen extends StatefulWidget {
   CustomersScreen({super.key});
@@ -102,6 +103,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
       appBar: AppBar(
         title: const Text("العملاء"),
         actions: [
+          // ✅ زر تقرير الأرباح
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfitReportScreen()),
+            ),
+            icon: const Icon(Icons.bar_chart),
+          ),
           IconButton(onPressed: _addCustomer, icon: const Icon(Icons.person_add_alt_1)),
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
