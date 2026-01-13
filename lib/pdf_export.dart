@@ -10,12 +10,22 @@ import "utils.dart";
 import "constants.dart";
 
 class PdfExporter {
-  static Future<void> exportOrderPdf({
-    required Customer customer,
-    required OrderHeader order,
-    required List<OrderItem> items,
-  }) async {
-    final doc = pw.Document();
+  static Future<void> _exportPdf() async {
+  final o = order;
+  final c = customer;
+  if (o == null || c == null) return;
+
+  try {
+    await PdfExporter.exportOrderPdf(customer: c, order: o, items: items);
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("PDF Error: $e")),
+      );
+    }
+  }
+}
+
 
     // ✅ Load Cairo font
     final fontData = await rootBundle.load("assets/fonts/Cairo-Regular.ttf");
