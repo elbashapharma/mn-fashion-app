@@ -84,4 +84,68 @@ class Repo {
     );
     return rows.map(OrderItem.fromMap).toList();
   }
+    // --------- Delivery ----------
+  Future<void> markOrderDelivered(int orderId, DateTime deliveredAt) async {
+    final d = await AppDb.instance.db;
+    await d.update(
+      "orders",
+      {"delivered_at": deliveredAt.millisecondsSinceEpoch},
+      where: "id=?",
+      whereArgs: [orderId],
+    );
+  }
+
+  // --------- Expenses ----------
+  Future<int> addExpense({
+    int? orderId,
+    int? customerId,
+    required double amountEgp,
+    required String type, // shipping / other
+    String? note,
+    DateTime? date,
+  }) async {
+    final d = await AppDb.instance.db;
+    return d.insert("expenses", {
+      "order_id": orderId,
+      "customer_id": customerId,
+      "amount_egp": amountEgp,
+      "type": type,
+      "note": note,
+      "created_at": (date ?? DateTime.now()).millisecondsSinceEpoch,
+    });
+  }
+
+  Future<double> sumExpensesBetween(DateTime from, DateTime to) async {
+    final d = await AppDb.instance.db;
+    final res = await d.rawQuery(
+      """
+      SELECT COALESCE(SUM(amount_egp),0) AS total
+      FROM expenses
+      WHERE created_at BETWEEN ? AND ?
+      """,
+      [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
+    );
+    return (res.first["total"] as num).toDouble();
+  }
+
+  // --------- Revenue (Delivered orders only) ----------
+  Future<double> sumRevenueBetween(DateTime from, DateTime to) async {
+    final d = await AppDb.instance.db;
+
+    // الإيراد = مجموع (سعر القطعة بالجنيه * الكمية) للأصناف المؤكدة
+    // وسعر القطعة بالجنيه عندك = (price_sar * rate_egp) + profit_egp
+    final res = await d.rawQuery(
+      """
+      SELECT COALESCE(SUM( ((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0) ),0) AS total
+      FROM items i
+      JOIN orders o ON o.id = i.order_id
+      WHERE i.status = 'confirmed'
+        AND o.delivered_at IS NOT NULL
+        AND o.delivered_at BETWEEN ? AND ?
+      """,
+      [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
+    );
+    return (res.first["total"] as num).toDouble();
+  }
+
 }
