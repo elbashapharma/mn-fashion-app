@@ -3,6 +3,8 @@ import "../models.dart";
 import "../repo.dart";
 import "orders_screen.dart";
 import "profit_report_screen.dart";
+import "debt_report_screen.dart";
+import "customer_finance_screen.dart";
 
 class CustomersScreen extends StatefulWidget {
   CustomersScreen({super.key});
@@ -103,14 +105,26 @@ class _CustomersScreenState extends State<CustomersScreen> {
       appBar: AppBar(
         title: const Text("العملاء"),
         actions: [
-          // ✅ زر تقرير الأرباح
+          // 📊 تقرير الأرباح العام
           IconButton(
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ProfitReportScreen()),
             ),
             icon: const Icon(Icons.bar_chart),
+            tooltip: "تقرير الأرباح",
           ),
+
+          // 💼 مديونية العملاء
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DebtReportScreen()),
+            ),
+            icon: const Icon(Icons.account_balance_wallet),
+            tooltip: "مديونية العملاء",
+          ),
+
           IconButton(onPressed: _addCustomer, icon: const Icon(Icons.person_add_alt_1)),
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
@@ -145,9 +159,17 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               onPressed: () => _deleteCustomer(c),
                               icon: const Icon(Icons.delete_outline),
                             ),
+
+                            // ضغط عادي: يفتح الطلبات
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(builder: (_) => OrdersScreen(customerId: c.id!)),
+                            ),
+
+                            // ضغط مطوّل: يفتح مالية العميل (دفعات + كشف حساب)
+                            onLongPress: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => CustomerFinanceScreen(customerId: c.id!)),
                             ),
                           );
                         },
