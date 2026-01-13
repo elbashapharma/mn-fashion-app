@@ -26,8 +26,6 @@ class OrderHeader {
   final int customerId;
   final DateTime createdAt;
   final double defaultRate;
-
-  // ✅ NEW
   final DateTime? deliveredAt;
 
   OrderHeader({
@@ -64,9 +62,11 @@ class OrderItem {
   final String imagePath;
   final String? note;
 
-  final double priceSar; // Sell SAR (سعر البيع بالريال)
+  final double buyPriceSar; // ✅ NEW (Buy SAR)
+  final double priceSar;    // Sell SAR
+
   final double rateEgp;
-  final double profitEgp; // الربح الإضافي بالجنيه (لكل قطعة)
+  final double profitEgp;   // extra profit per piece (EGP)
 
   final ShippingType shipping;
   final ItemStatus status;
@@ -79,6 +79,7 @@ class OrderItem {
     required this.orderId,
     required this.imagePath,
     this.note,
+    required this.buyPriceSar,
     required this.priceSar,
     required this.rateEgp,
     required this.profitEgp,
@@ -88,14 +89,24 @@ class OrderItem {
     this.qty,
   });
 
-  double get unitPriceEgp => (priceSar * rateEgp) + profitEgp;
-  double get lineTotal => (qty ?? 0) * unitPriceEgp;
+  int get q => qty ?? 0;
+
+  // Revenue / Cost / Profit (EGP)
+  double get revenueEgp => (priceSar * rateEgp) * q;
+  double get costEgp => (buyPriceSar * rateEgp) * q;
+  double get extraProfitEgpTotal => profitEgp * q;
+  double get grossProfitEgp => (revenueEgp - costEgp) + extraProfitEgpTotal;
+
+  // For old UI
+  double get unitSellEgp => (priceSar * rateEgp);
+  double get unitCostEgp => (buyPriceSar * rateEgp);
 
   OrderItem copyWith({
     int? id,
     int? orderId,
     String? imagePath,
     String? note,
+    double? buyPriceSar,
     double? priceSar,
     double? rateEgp,
     double? profitEgp,
@@ -109,6 +120,7 @@ class OrderItem {
         orderId: orderId ?? this.orderId,
         imagePath: imagePath ?? this.imagePath,
         note: note ?? this.note,
+        buyPriceSar: buyPriceSar ?? this.buyPriceSar,
         priceSar: priceSar ?? this.priceSar,
         rateEgp: rateEgp ?? this.rateEgp,
         profitEgp: profitEgp ?? this.profitEgp,
@@ -123,6 +135,7 @@ class OrderItem {
         "order_id": orderId,
         "image_path": imagePath,
         "note": note,
+        "buy_price_sar": buyPriceSar,
         "price_sar": priceSar,
         "rate_egp": rateEgp,
         "profit_egp": profitEgp,
@@ -150,6 +163,7 @@ class OrderItem {
         orderId: m["order_id"] as int,
         imagePath: m["image_path"] as String,
         note: m["note"] as String?,
+        buyPriceSar: (m["buy_price_sar"] as num).toDouble(),
         priceSar: (m["price_sar"] as num).toDouble(),
         rateEgp: (m["rate_egp"] as num).toDouble(),
         profitEgp: (m["profit_egp"] as num).toDouble(),
