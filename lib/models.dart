@@ -8,14 +8,7 @@ class Customer {
 
   Customer({this.id, required this.name, this.whatsapp});
 
-  Customer copyWith({int? id, String? name, String? whatsapp}) =>
-      Customer(id: id ?? this.id, name: name ?? this.name, whatsapp: whatsapp ?? this.whatsapp);
-
-  Map<String, Object?> toMap() => {
-        "id": id,
-        "name": name,
-        "whatsapp": whatsapp,
-      };
+  Map<String, Object?> toMap() => {"id": id, "name": name, "whatsapp": whatsapp};
 
   static Customer fromMap(Map<String, Object?> m) =>
       Customer(id: m["id"] as int?, name: m["name"] as String, whatsapp: m["whatsapp"] as String?);
@@ -36,22 +29,12 @@ class OrderHeader {
     this.deliveredAt,
   });
 
-  Map<String, Object?> toMap() => {
-        "id": id,
-        "customer_id": customerId,
-        "created_at": createdAt.millisecondsSinceEpoch,
-        "default_rate": defaultRate,
-        "delivered_at": deliveredAt?.millisecondsSinceEpoch,
-      };
-
   static OrderHeader fromMap(Map<String, Object?> m) => OrderHeader(
         id: m["id"] as int?,
         customerId: m["customer_id"] as int,
         createdAt: DateTime.fromMillisecondsSinceEpoch(m["created_at"] as int),
         defaultRate: (m["default_rate"] as num).toDouble(),
-        deliveredAt: (m["delivered_at"] == null)
-            ? null
-            : DateTime.fromMillisecondsSinceEpoch(m["delivered_at"] as int),
+        deliveredAt: (m["delivered_at"] == null) ? null : DateTime.fromMillisecondsSinceEpoch(m["delivered_at"] as int),
       );
 }
 
@@ -62,11 +45,11 @@ class OrderItem {
   final String imagePath;
   final String? note;
 
-  final double buyPriceSar; // ✅ NEW (Buy SAR)
-  final double priceSar;    // Sell SAR
+  final double buyPriceSar; // Buy SAR
+  final double priceSar; // Sell SAR
 
   final double rateEgp;
-  final double profitEgp;   // extra profit per piece (EGP)
+  final double profitEgp; // extra profit per piece (EGP)
 
   final ShippingType shipping;
   final ItemStatus status;
@@ -91,38 +74,31 @@ class OrderItem {
 
   int get q => qty ?? 0;
 
-  // Revenue / Cost / Profit (EGP)
+  // ✅ حسابات
   double get revenueEgp => (priceSar * rateEgp) * q;
   double get costEgp => (buyPriceSar * rateEgp) * q;
   double get extraProfitEgpTotal => profitEgp * q;
   double get grossProfitEgp => (revenueEgp - costEgp) + extraProfitEgpTotal;
 
-  // For old UI
-  double get unitSellEgp => (priceSar * rateEgp);
-  double get unitCostEgp => (buyPriceSar * rateEgp);
-
-    // ✅ Backward compatible getters (for older screens/PDF)
+  // ✅ Backward compatibility (PDF/شاشات قديمة)
   double get unitPriceEgp => ((priceSar * rateEgp) + profitEgp);
   double get lineTotal => unitPriceEgp * q;
 
   OrderItem copyWith({
-    int? id,
-    int? orderId,
-    String? imagePath,
-    String? note,
     double? buyPriceSar,
     double? priceSar,
     double? rateEgp,
     double? profitEgp,
     ShippingType? shipping,
     ItemStatus? status,
+    String? note,
     String? size,
     int? qty,
   }) =>
       OrderItem(
-        id: id ?? this.id,
-        orderId: orderId ?? this.orderId,
-        imagePath: imagePath ?? this.imagePath,
+        id: id,
+        orderId: orderId,
+        imagePath: imagePath,
         note: note ?? this.note,
         buyPriceSar: buyPriceSar ?? this.buyPriceSar,
         priceSar: priceSar ?? this.priceSar,
