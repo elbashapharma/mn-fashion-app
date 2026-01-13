@@ -123,10 +123,10 @@ class Repo {
     return (res.first["total"] as num).toDouble();
   }
 
-  // ---------- Payments ----------
+  // ✅ ---------- PAYMENTS ----------
   Future<int> addPayment({
     required int customerId,
-    int? orderId,
+    int? orderId, // null => دفعة تحت الحساب
     required double amountEgp,
     String? note,
     DateTime? date,
@@ -188,7 +188,7 @@ class Repo {
     return (res.first["total"] as num).toDouble();
   }
 
-  // ---------- Customer Debt (Delivered Only) ----------
+  // ---------- Debts delivered only ----------
   Future<List<Map<String, Object?>>> debtsDeliveredOnly() async {
     final d = await AppDb.instance.db;
 
@@ -218,15 +218,13 @@ class Repo {
       final revenue = (r["revenue"] as num).toDouble();
       final paid = paidMap[cid] ?? 0;
       final bal = revenue - paid;
-      if (bal > 0.0001) {
-        out.add({"customer_id": cid, "revenue": revenue, "paid": paid, "balance": bal});
-      }
+      if (bal > 0.0001) out.add({"customer_id": cid, "revenue": revenue, "paid": paid, "balance": bal});
     }
     out.sort((a, b) => (b["balance"] as double).compareTo(a["balance"] as double));
     return out;
   }
 
-  // ---------- Dashboard Summary ----------
+  // ---------- Dashboard summary ----------
   Future<Map<String, Object>> ordersSummary(DateTime from, DateTime to) async {
     final d = await AppDb.instance.db;
 
