@@ -478,5 +478,15 @@ class Repo {
     );
     return (res.first["total"] as num).toDouble();
   }
+  Future<double> sumConfirmedCostAllOpenOrders() async {
+    final d = await AppDb.instance.db;
+    final res = await d.rawQuery("""
+      SELECT COALESCE(SUM((i.buy_price_sar * i.rate_egp) * COALESCE(i.qty,0)),0) AS total
+      FROM items i
+      JOIN orders o ON o.id=i.order_id
+      WHERE i.status='confirmed'
+    """);
+    return (res.first["total"] as num).toDouble();
+  }
 
 }
