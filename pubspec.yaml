@@ -12,7 +12,6 @@ dependencies:
   bidi: ^2.0.10
 
   flutter:
-  flutter:
   assets:
     - assets/fonts/Cairo-Regular.ttf
 
