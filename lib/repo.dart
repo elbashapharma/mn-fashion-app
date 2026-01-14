@@ -1,5 +1,6 @@
 import "db.dart";
 import "models.dart";
+import 'models/dashboard_summary.dart';
 
 class Repo {
   Repo._();
