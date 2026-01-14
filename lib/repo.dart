@@ -19,16 +19,6 @@ Future<Customer> getCustomer(int id) async {
   return Customer.fromMap(res.first);
 }
 
-String _normWhats(String? w) {
-  if (w == null) return "";
-  var s = w.trim();
-  s = s.replaceAll(" ", "");
-  s = s.replaceAll("-", "");
-  if (s.startsWith("+")) s = s.substring(1);
-  if (s.startsWith("00")) s = s.substring(2);
-  return s;
-}
-
 Future<int> addCustomer(Customer c) async {
   final d = await AppDb.instance.db;
 
