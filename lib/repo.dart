@@ -556,6 +556,33 @@ Future<double> sumConfirmedCostAll() async {
   if (s.startsWith("00")) s = s.substring(2);
   return s;
 }
+ // هل للعميل طلبات؟
+Future<bool> customerHasOrders(int customerId) async {
+  final d = await AppDb.instance.db;
+  final r = await d.rawQuery(
+    "SELECT COUNT(*) AS c FROM orders WHERE customer_id=?",
+    [customerId],
+  );
+  return (r.first["c"] as int) > 0;
+}
 
+// رصيد العميل
+Future<double> customerBalance(int customerId) async {
+  final revenue = await customerDeliveredRevenue(customerId);
+  final paid = await sumPaymentsForCustomer(customerId);
+  return revenue - paid;
+}
+
+// أرشفة العميل
+Future<void> archiveCustomer(int customerId) async {
+  final d = await AppDb.instance.db;
+  await d.update(
+    "customers",
+    {"is_archived": 1},
+    where: "id=?",
+    whereArgs: [customerId],
+  );
+}
+ 
 }
 
