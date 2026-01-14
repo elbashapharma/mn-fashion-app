@@ -441,4 +441,29 @@ class Repo {
       payments: payments,
     );
   }
+  // For Finance screen: revenue for a customer (delivered orders only)
+Future<double> sumRevenueForCustomerDelivered(int customerId) async {
+  final d = await AppDb.instance.db;
+  final res = await d.rawQuery("""
+    SELECT COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS total
+    FROM items i
+    JOIN orders o ON o.id = i.order_id
+    WHERE o.customer_id = ?
+      AND o.delivered_at IS NOT NULL
+      AND i.status = 'confirmed'
+  """, [customerId]);
+
+  return (res.first["total"] as num).toDouble();
+}
+
+// For Dashboard: confirmed cost for all items (supplier need)
+Future<double> sumConfirmedCostAll() async {
+  final d = await AppDb.instance.db;
+  final res = await d.rawQuery("""
+    SELECT COALESCE(SUM((buy_price_sar * rate_egp) * COALESCE(qty,0)),0) AS total
+    FROM items
+    WHERE status='confirmed'
+  """);
+  return (res.first["total"] as num).toDouble();
+}
 }
