@@ -24,7 +24,7 @@ class Repo {
     return d.insert("customers", c.toMap());
   }
 
-  Future<void> deleteCustomer(int id) async {
+  Future<void> archiveCustomer + deleteCustomerHard async {
     final d = await AppDb.instance.db;
     await d.delete("customers", where: "id=?", whereArgs: [id]);
   }
@@ -466,4 +466,18 @@ Future<double> sumConfirmedCostAll() async {
   """);
   return (res.first["total"] as num).toDouble();
 }
+  String _normWhats(String? w) {
+  if (w == null) return "";
+  var s = w.trim();
+  s = s.replaceAll(" ", "");
+  s = s.replaceAll("-", "");
+  s = s.replaceAll("(", "");
+  s = s.replaceAll(")", "");
+  // شيل + و 00
+  if (s.startsWith("+")) s = s.substring(1);
+  if (s.startsWith("00")) s = s.substring(2);
+  return s;
 }
+
+}
+
