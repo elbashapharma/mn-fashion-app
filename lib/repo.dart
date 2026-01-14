@@ -1,6 +1,6 @@
 import "db.dart";
 import "models.dart";
-import 'models/dashboard_summary.dart';
+import "models/dashboard_summary.dart";
 
 class Repo {
   Repo._();
@@ -124,7 +124,7 @@ class Repo {
     return (res.first["total"] as num).toDouble();
   }
 
-  // ✅ ---------- PAYMENTS ----------
+  // ---------- Payments ----------
   Future<int> addPayment({
     required int customerId,
     int? orderId, // null => دفعة تحت الحساب
@@ -225,7 +225,7 @@ class Repo {
     return out;
   }
 
-  // ---------- Dashboard summary ----------
+  // ---------- Dashboard orders summary (Map) ----------
   Future<Map<String, Object>> ordersSummary(DateTime from, DateTime to) async {
     final d = await AppDb.instance.db;
 
@@ -273,16 +273,14 @@ class Repo {
       "cancelled_count": await _count("cancelled"),
       "cancelled_total": await _sum("cancelled"),
     };
-      // =========================
+  }
+
+  // =========================
   // Customer Statement (Ledger)
   // =========================
-
-  // returns list of maps:
-  // {type: 'order'|'payment' , created_at:int , order_id:int? , amount:double , note:String? }
   Future<List<Map<String, Object?>>> customerLedger(int customerId) async {
     final d = await AppDb.instance.db;
 
-    // orders (delivered only) as DEBIT
     final orders = await d.rawQuery("""
       SELECT 
         o.created_at AS created_at,
@@ -294,7 +292,6 @@ class Repo {
       GROUP BY o.id
     """, [customerId]);
 
-    // payments (all) as CREDIT
     final pays = await d.rawQuery("""
       SELECT 
         created_at AS created_at,
@@ -342,103 +339,6 @@ class Repo {
   }
 
   // =========================
-  // Profit calculations
-  // =========================
-  Future<double> sumDeliveredRevenueBetween(DateTime from, DateTime to) async {
-    final d = await AppDb.instance.db;
-    final res = await d.rawQuery("""
-      SELECT COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS total
-      FROM items i JOIN orders o ON o.id=i.order_id
-      WHERE i.status='confirmed' AND o.delivered_at IS NOT NULL
-        AND o.created_at BETWEEN ? AND ?
-    """, [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch]);
-    return (res.first["total"] as num).toDouble();
-  }
-
-  Future<double> sumDeliveredCostBetween(DateTime from, DateTime to) async {
-    final d = await AppDb.instance.db;
-    final res = await d.rawQuery("""
-      SELECT COALESCE(SUM((i.buy_price_sar * i.rate_egp) * COALESCE(i.qty,0)),0) AS total
-      FROM items i JOIN orders o ON o.id=i.order_id
-      WHERE i.status='confirmed' AND o.delivered_at IS NOT NULL
-        AND o.created_at BETWEEN ? AND ?
-    """, [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch]);
-    return (res.first["total"] as num).toDouble();
-  }
-
-  }
-    // =========================
-  // Customer delivered revenue (for Finance screen)
-  // =========================
-  Future<double> sumRevenueForCustomerDelivered(int customerId) async {
-    final d = await AppDb.instance.db;
-    final res = await d.rawQuery("""
-      SELECT COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS total
-      FROM items i
-      JOIN orders o ON o.id = i.order_id
-      WHERE o.customer_id = ?
-        AND o.delivered_at IS NOT NULL
-        AND i.status = 'confirmed'
-    """, [customerId]);
-
-    return (res.first["total"] as num).toDouble();
-  }
-
-  // =========================
-  // Customer ledger (statement)
-  // orders delivered => DEBIT
-  // payments => CREDIT (order_id may be null = تحت الحساب)
-  // =========================
-  Future<List<Map<String, Object?>>> customerLedger(int customerId) async {
-    final d = await AppDb.instance.db;
-
-    final orders = await d.rawQuery("""
-      SELECT 
-        o.created_at AS created_at,
-        o.id AS order_id,
-        COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS amount
-      FROM orders o
-      LEFT JOIN items i ON i.order_id=o.id AND i.status='confirmed'
-      WHERE o.customer_id=? AND o.delivered_at IS NOT NULL
-      GROUP BY o.id
-    """, [customerId]);
-
-    final pays = await d.rawQuery("""
-      SELECT 
-        created_at AS created_at,
-        order_id AS order_id,
-        amount_egp AS amount,
-        note AS note
-      FROM payments
-      WHERE customer_id=?
-    """, [customerId]);
-
-    final out = <Map<String, Object?>>[];
-
-    for (final r in orders) {
-      out.add({
-        "type": "order",
-        "created_at": r["created_at"],
-        "order_id": r["order_id"],
-        "amount": (r["amount"] as num).toDouble(),
-        "note": "أوردر مُسلّم",
-      });
-    }
-
-    for (final r in pays) {
-      out.add({
-        "type": "payment",
-        "created_at": r["created_at"],
-        "order_id": r["order_id"],
-        "amount": (r["amount"] as num).toDouble(),
-        "note": r["note"],
-      });
-    }
-
-    out.sort((a, b) => (a["created_at"] as int).compareTo(b["created_at"] as int));
-    return out;
-  }
-  // =========================
   // Cash Drawer
   // =========================
   Future<int> addCashTxn({
@@ -479,6 +379,7 @@ class Repo {
     );
     return (res.first["total"] as num).toDouble();
   }
+
   Future<double> sumConfirmedCostAllOpenOrders() async {
     final d = await AppDb.instance.db;
     final res = await d.rawQuery("""
@@ -489,182 +390,55 @@ class Repo {
     """);
     return (res.first["total"] as num).toDouble();
   }
-// ======== DASHBOARD MODELS ========
 
-class DashboardSummary {
-  final int pendingCount;
-  final int confirmedCount;
-  final int cancelledCount;
+  // =========================
+  // DashboardSummary (typed)
+  // =========================
+  Future<DashboardSummary> dashboardSummary(DateTime from, DateTime to) async {
+    final d = await AppDb.instance.db;
 
-  final double pendingTotal;
-  final double confirmedTotal;
-  final double cancelledTotal;
+    Future<int> _count(String status) async {
+      final r = await d.rawQuery("SELECT COUNT(*) AS c FROM items WHERE status=?", [status]);
+      return (r.first["c"] as num).toInt();
+    }
 
-  final int deliveredOrders;
+    Future<double> _sumSell(String status) async {
+      final r = await d.rawQuery("""
+        SELECT COALESCE(SUM(((price_sar*rate_egp)+profit_egp)*COALESCE(qty,0)),0) AS total
+        FROM items
+        WHERE status=?
+      """, [status]);
+      return (r.first["total"] as num).toDouble();
+    }
 
-  final double deliveredRevenue;
-  final double deliveredCost;
-  final double orderExpenses;
-  final double payments;
+    final pendingCount = await _count("pending");
+    final confirmedCount = await _count("confirmed");
+    final cancelledCount = await _count("cancelled");
 
-  DashboardSummary({
-    required this.pendingCount,
-    required this.confirmedCount,
-    required this.cancelledCount,
-    required this.pendingTotal,
-    required this.confirmedTotal,
-    required this.cancelledTotal,
-    required this.deliveredOrders,
-    required this.deliveredRevenue,
-    required this.deliveredCost,
-    required this.orderExpenses,
-    required this.payments,
-  });
-}
+    final pendingTotal = await _sumSell("pending");
+    final confirmedTotal = await _sumSell("confirmed");
+    final cancelledTotal = await _sumSell("cancelled");
 
-// ======== CASH ========
+    final delivered = await d.rawQuery("SELECT COUNT(*) AS c FROM orders WHERE delivered_at IS NOT NULL");
+    final deliveredOrders = (delivered.first["c"] as num).toInt();
 
-Future<int> addCashTxn({
-  required String type,
-  required double amountEgp,
-  String? note,
-  int? customerId,
-  int? orderId,
-  DateTime? date,
-}) async {
-  final d = await AppDb.instance.db;
-  return d.insert("cash_txns", {
-    "created_at": (date ?? DateTime.now()).millisecondsSinceEpoch,
-    "type": type,
-    "amount_egp": amountEgp,
-    "note": note,
-    "customer_id": customerId,
-    "order_id": orderId,
-  });
-}
+    final deliveredRevenue = await sumDeliveredRevenueBetween(from, to);
+    final deliveredCost = await sumDeliveredCostBetween(from, to);
+    final orderExpenses = await sumExpensesBetween(from, to);
+    final payments = await sumPaymentsBetween(from, to);
 
-Future<double> cashBalance() async {
-  final d = await AppDb.instance.db;
-  final res = await d.rawQuery("SELECT COALESCE(SUM(amount_egp),0) AS total FROM cash_txns");
-  return (res.first["total"] as num).toDouble();
-}
-
-// ======== CONFIRMED COST (supplier need) ========
-
-Future<double> sumConfirmedCostAll() async {
-  final d = await AppDb.instance.db;
-  final res = await d.rawQuery("""
-    SELECT COALESCE(SUM((buy_price_sar * rate_egp) * COALESCE(qty,0)),0) AS total
-    FROM items
-    WHERE status='confirmed'
-  """);
-  return (res.first["total"] as num).toDouble();
-}
-
-// ======== PAYMENTS SUM BETWEEN ========
-
-Future<double> sumPaymentsBetween(DateTime from, DateTime to) async {
-  final d = await AppDb.instance.db;
-  final res = await d.rawQuery(
-    "SELECT COALESCE(SUM(amount_egp),0) AS total FROM payments WHERE created_at BETWEEN ? AND ?",
-    [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
-  );
-  return (res.first["total"] as num).toDouble();
-}
-
-// ======== EXPENSES SUM BETWEEN (orders expenses table) ========
-
-Future<double> sumExpensesBetween(DateTime from, DateTime to) async {
-  final d = await AppDb.instance.db;
-  final res = await d.rawQuery(
-    "SELECT COALESCE(SUM(amount_egp),0) AS total FROM expenses WHERE created_at BETWEEN ? AND ?",
-    [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch],
-  );
-  return (res.first["total"] as num).toDouble();
-}
-
-// ======== DELIVERED REVENUE/COST BETWEEN ========
-
-Future<double> sumDeliveredRevenueBetween(DateTime from, DateTime to) async {
-  final d = await AppDb.instance.db;
-  final res = await d.rawQuery("""
-    SELECT COALESCE(SUM(((price_sar*rate_egp)+profit_egp)*COALESCE(qty,0)),0) AS total
-    FROM items i
-    JOIN orders o ON o.id=i.order_id
-    WHERE i.status='confirmed'
-      AND o.delivered_at IS NOT NULL
-      AND o.created_at BETWEEN ? AND ?
-  """, [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch]);
-  return (res.first["total"] as num).toDouble();
-}
-
-Future<double> sumDeliveredCostBetween(DateTime from, DateTime to) async {
-  final d = await AppDb.instance.db;
-  final res = await d.rawQuery("""
-    SELECT COALESCE(SUM((buy_price_sar*rate_egp)*COALESCE(qty,0)),0) AS total
-    FROM items i
-    JOIN orders o ON o.id=i.order_id
-    WHERE i.status='confirmed'
-      AND o.delivered_at IS NOT NULL
-      AND o.created_at BETWEEN ? AND ?
-  """, [from.millisecondsSinceEpoch, to.millisecondsSinceEpoch]);
-  return (res.first["total"] as num).toDouble();
-}
-
-// ======== DASHBOARD SUMMARY ========
-
-Future<DashboardSummary> dashboardSummary(DateTime from, DateTime to) async {
-  final d = await AppDb.instance.db;
-
-  // counts by status
-  Future<int> _count(String status) async {
-    final r = await d.rawQuery("SELECT COUNT(*) AS c FROM items WHERE status=?", [status]);
-    return (r.first["c"] as int);
+    return DashboardSummary(
+      pendingCount: pendingCount,
+      confirmedCount: confirmedCount,
+      cancelledCount: cancelledCount,
+      pendingTotal: pendingTotal,
+      confirmedTotal: confirmedTotal,
+      cancelledTotal: cancelledTotal,
+      deliveredOrders: deliveredOrders,
+      deliveredRevenue: deliveredRevenue,
+      deliveredCost: deliveredCost,
+      orderExpenses: orderExpenses,
+      payments: payments,
+    );
   }
-
-  Future<double> _sumSell(String status) async {
-    // sum sell in EGP for items status (requires qty)
-    final r = await d.rawQuery("""
-      SELECT COALESCE(SUM(((price_sar*rate_egp)+profit_egp)*COALESCE(qty,0)),0) AS total
-      FROM items
-      WHERE status=?
-    """, [status]);
-    return (r.first["total"] as num).toDouble();
-  }
-
-  final pendingCount = await _count("pending");
-  final confirmedCount = await _count("confirmed");
-  final cancelledCount = await _count("cancelled");
-
-  final pendingTotal = await _sumSell("pending");
-  final confirmedTotal = await _sumSell("confirmed");
-  final cancelledTotal = await _sumSell("cancelled");
-
-  final delivered = await d.rawQuery("""
-    SELECT COUNT(*) AS c
-    FROM orders
-    WHERE delivered_at IS NOT NULL
-  """);
-  final deliveredOrders = (delivered.first["c"] as int);
-
-  final deliveredRevenue = await sumDeliveredRevenueBetween(from, to);
-  final deliveredCost = await sumDeliveredCostBetween(from, to);
-  final orderExpenses = await sumExpensesBetween(from, to);
-  final payments = await sumPaymentsBetween(from, to);
-
-  return DashboardSummary(
-    pendingCount: pendingCount,
-    confirmedCount: confirmedCount,
-    cancelledCount: cancelledCount,
-    pendingTotal: pendingTotal,
-    confirmedTotal: confirmedTotal,
-    cancelledTotal: cancelledTotal,
-    deliveredOrders: deliveredOrders,
-    deliveredRevenue: deliveredRevenue,
-    deliveredCost: deliveredCost,
-    orderExpenses: orderExpenses,
-    payments: payments,
-  );
-}
-
 }
