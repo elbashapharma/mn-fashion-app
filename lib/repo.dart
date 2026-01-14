@@ -6,28 +6,116 @@ class Repo {
   Repo._();
   static final Repo instance = Repo._();
 
-  // ---------- Customers ----------
-  Future<List<Customer>> listCustomers() async {
-    final d = await AppDb.instance.db;
-    final res = await d.query("customers", orderBy: "name ASC");
-    return res.map(Customer.fromMap).toList();
+ // ---------- Customers ----------
+Future<List<Customer>> listCustomers() async {
+  final d = await AppDb.instance.db;
+  final res = await d.query("customers", where: "is_archived=0", orderBy: "name ASC");
+  return res.map(Customer.fromMap).toList();
+}
+
+Future<Customer> getCustomer(int id) async {
+  final d = await AppDb.instance.db;
+  final res = await d.query("customers", where: "id=?", whereArgs: [id]);
+  return Customer.fromMap(res.first);
+}
+
+String _normWhats(String? w) {
+  if (w == null) return "";
+  var s = w.trim();
+  s = s.replaceAll(" ", "");
+  s = s.replaceAll("-", "");
+  if (s.startsWith("+")) s = s.substring(1);
+  if (s.startsWith("00")) s = s.substring(2);
+  return s;
+}
+
+Future<int> addCustomer(Customer c) async {
+  final d = await AppDb.instance.db;
+
+  final w = _normWhats(c.whatsapp);
+  if (w.isNotEmpty) {
+    final dup = await d.query(
+      "customers",
+      columns: ["id", "name"],
+      where: "whatsapp=? AND is_archived=0",
+      whereArgs: [w],
+      limit: 1,
+    );
+    if (dup.isNotEmpty) {
+      final existingName = dup.first["name"] as String? ?? "";
+      throw Exception("رقم الواتساب مكرر مع العميل: $existingName");
+    }
   }
 
-  Future<Customer> getCustomer(int id) async {
-    final d = await AppDb.instance.db;
-    final res = await d.query("customers", where: "id=?", whereArgs: [id]);
-    return Customer.fromMap(res.first);
-  }
+  return d.insert("customers", {
+    "name": c.name,
+    "whatsapp": w.isEmpty ? null : w,
+    "delivery_address": c.deliveryAddress,
+    "is_archived": 0,
+  });
+}
 
-  Future<int> addCustomer(Customer c) async {
-    final d = await AppDb.instance.db;
-    return d.insert("customers", c.toMap());
-  }
+Future<void> updateCustomerDeliveryAddress(int customerId, String? address) async {
+  final d = await AppDb.instance.db;
+  await d.update(
+    "customers",
+    {"delivery_address": (address ?? "").trim()},
+    where: "id=?",
+    whereArgs: [customerId],
+  );
+}
 
-  Future<void> archiveCustomer + deleteCustomerHard async {
-    final d = await AppDb.instance.db;
-    await d.delete("customers", where: "id=?", whereArgs: [id]);
+Future<bool> customerHasAnyOrders(int customerId) async {
+  final d = await AppDb.instance.db;
+  final r = await d.rawQuery("SELECT COUNT(*) AS c FROM orders WHERE customer_id=?", [customerId]);
+  return ((r.first["c"] as num).toInt() > 0);
+}
+
+Future<double> customerDebtDeliveredOnly(int customerId) async {
+  final d = await AppDb.instance.db;
+
+  final rev = await d.rawQuery("""
+    SELECT COALESCE(SUM(((i.price_sar * i.rate_egp) + i.profit_egp) * COALESCE(i.qty,0)),0) AS total
+    FROM items i
+    JOIN orders o ON o.id=i.order_id
+    WHERE o.customer_id=? AND o.delivered_at IS NOT NULL AND i.status='confirmed'
+  """, [customerId]);
+  final revenue = (rev.first["total"] as num).toDouble();
+
+  final pay = await d.rawQuery("""
+    SELECT COALESCE(SUM(amount_egp),0) AS total
+    FROM payments
+    WHERE customer_id=?
+  """, [customerId]);
+  final paid = (pay.first["total"] as num).toDouble();
+
+  final bal = revenue - paid;
+  return bal < 0 ? 0 : bal;
+}
+
+// ✅ دي اللي الشاشة بتنده عليها (حل سريع)
+Future<void> deleteCustomer(int customerId) async {
+  final hasOrders = await customerHasAnyOrders(customerId);
+  final debt = await customerDebtDeliveredOnly(customerId);
+
+  final d = await AppDb.instance.db;
+
+  if (hasOrders || debt > 0.0001) {
+    // أرشفة بدل الحذف
+    await d.update("customers", {"is_archived": 1}, where: "id=?", whereArgs: [customerId]);
+    throw Exception("لا يمكن حذف العميل لأنه لديه طلبات أو مديونية. تم أرشفته بدلًا من ذلك.");
+  } else {
+    // حذف فعلي
+    await d.delete("customers", where: "id=?", whereArgs: [customerId]);
   }
+}
+
+// لو عايز زر “أرشفة” منفصل
+Future<void> archiveCustomer(int customerId) async {
+  final d = await AppDb.instance.db;
+  await d.update("customers", {"is_archived": 1}, where: "id=?", whereArgs: [customerId]);
+}
+
 
   // ---------- Orders ----------
   Future<int> createOrder(int customerId, double defaultRate) async {
