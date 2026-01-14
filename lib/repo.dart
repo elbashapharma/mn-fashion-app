@@ -583,6 +583,26 @@ Future<void> archiveCustomer(int customerId) async {
     whereArgs: [customerId],
   );
 }
- 
+ Future<Customer?> findCustomerByWhatsapp(String whatsapp) async {
+  final d = await AppDb.instance.db;
+  final norm = _normWhats(whatsapp);
+  final res = await d.rawQuery("""
+    SELECT * FROM customers
+    WHERE whatsapp IS NOT NULL
+  """);
+
+  for (final r in res) {
+    if (_normWhats(r["whatsapp"] as String?) == norm) {
+      return Customer.fromMap(r);
+    }
+  }
+  return null;
+}
+final exists = await Repo.instance.findCustomerByWhatsapp(whatsapp);
+if (exists != null) {
+  // Dialog
+  "العميل موجود مسبقًا: ${exists.name}"
+}
+
 }
 
