@@ -573,16 +573,6 @@ Future<double> customerBalance(int customerId) async {
   return revenue - paid;
 }
 
-// أرشفة العميل
-Future<void> archiveCustomer(int customerId) async {
-  final d = await AppDb.instance.db;
-  await d.update(
-    "customers",
-    {"is_archived": 1},
-    where: "id=?",
-    whereArgs: [customerId],
-  );
-}
  Future<Customer?> findCustomerByWhatsapp(String whatsapp) async {
   final d = await AppDb.instance.db;
   final norm = _normWhats(whatsapp);
