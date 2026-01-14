@@ -15,24 +15,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool loading = true;
 
-  // orders status summary
-  int pendingCount = 0;
-  int confirmedCount = 0;
-  int cancelledCount = 0;
+  // counts
+  int pendingItems = 0;
+  int confirmedItems = 0;
+  int cancelledItems = 0;
+
   int deliveredOrders = 0;
 
+  // totals (confirmed revenue etc)
   double pendingTotal = 0;
   double confirmedTotal = 0;
   double cancelledTotal = 0;
 
-  // money
-  double cash = 0;
-  double supplierNeed = 0;
+  // business metrics
+  double cashBalance = 0;         // درج النقدية
+  double supplierNeed = 0;        // تكلفة شراء المؤكد (قبل التسليم)
+  double deliveredRevenue = 0;    // إيراد الطلبات المسلمة داخل المدة
+  double deliveredCost = 0;       // تكلفة شراء الطلبات المسلمة داخل المدة
+  double orderExpenses = 0;       // مصروفات شحن/مصروفات مرتبطة بالطلبات داخل المدة
+  double payments = 0;            // تحصيل العملاء داخل المدة (من payments table)
 
-  double revenueDelivered = 0;
-  double costDelivered = 0;
-  double expenses = 0;
-  double payments = 0;
+  double get grossProfit => deliveredRevenue - deliveredCost;
+  double get netProfit => grossProfit - orderExpenses;
 
   @override
   void initState() {
@@ -41,7 +45,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _pickFrom() async {
-    final d = await showDatePicker(context: context, initialDate: from, firstDate: DateTime(2020), lastDate: DateTime(2100));
+    final d = await showDatePicker(
+      context: context,
+      initialDate: from,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
     if (d != null) {
       setState(() => from = DateTime(d.year, d.month, d.day, 0, 0, 0));
       await _load();
@@ -49,7 +58,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _pickTo() async {
-    final d = await showDatePicker(context: context, initialDate: to, firstDate: DateTime(2020), lastDate: DateTime(2100));
+    final d = await showDatePicker(
+      context: context,
+      initialDate: to,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
     if (d != null) {
       setState(() => to = DateTime(d.year, d.month, d.day, 23, 59, 59));
       await _load();
@@ -59,49 +73,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _load() async {
     setState(() => loading = true);
 
-    // لازم تكون عندك موجودة أو أضفتها قبل كده
-    final summary = await Repo.instance.ordersSummary(from, to);
-
-    final cashBal = await Repo.instance.cashBalance();
-    final need = await Repo.instance.sumConfirmedCostAllOpenOrders();
-
-    final rev = await Repo.instance.sumDeliveredRevenueBetween(from, to);
-    final cost = await Repo.instance.sumDeliveredCostBetween(from, to);
-    final exp = await Repo.instance.sumExpensesBetween(from, to);
-    final pay = await Repo.instance.sumPaymentsBetween(from, to);
+    final summary = await Repo.instance.dashboardSummary(from, to);
+    final cash = await Repo.instance.cashBalance();
+    final need = await Repo.instance.sumConfirmedCostAll();
 
     setState(() {
-      pendingCount = summary["pending_count"] as int;
-      confirmedCount = summary["confirmed_count"] as int;
-      cancelledCount = summary["cancelled_count"] as int;
+      pendingItems = summary.pendingCount;
+      confirmedItems = summary.confirmedCount;
+      cancelledItems = summary.cancelledCount;
 
-      pendingTotal = summary["pending_total"] as double;
-      confirmedTotal = summary["confirmed_total"] as double;
-      cancelledTotal = summary["cancelled_total"] as double;
+      pendingTotal = summary.pendingTotal;
+      confirmedTotal = summary.confirmedTotal;
+      cancelledTotal = summary.cancelledTotal;
 
-      deliveredOrders = summary["orders_delivered"] as int;
+      deliveredOrders = summary.deliveredOrders;
 
-      cash = cashBal;
+      deliveredRevenue = summary.deliveredRevenue;
+      deliveredCost = summary.deliveredCost;
+      orderExpenses = summary.orderExpenses;
+      payments = summary.payments;
+
+      cashBalance = cash;
       supplierNeed = need;
-
-      revenueDelivered = rev;
-      costDelivered = cost;
-      expenses = exp;
-      payments = pay;
 
       loading = false;
     });
   }
 
-  double get grossProfit => revenueDelivered - costDelivered;
-  double get netProfit => grossProfit - expenses;
-
   Future<void> _openingBalance() async {
     final amountCtrl = TextEditingController();
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("رصيد أول مدة (الدرج)"),
+        title: const Text("رصيد أول مدة (درج النقدية)"),
         content: TextField(
           controller: amountCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -117,17 +122,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (ok == true) {
       final v = double.tryParse(amountCtrl.text.trim()) ?? 0;
       if (v <= 0) return;
-      await Repo.instance.addCashTxn(type: "opening", amountEgp: v, note: "رصيد أول مدة");
+      await Repo.instance.addCashTxn(
+        type: "opening",
+        amountEgp: v,
+        note: "رصيد أول مدة",
+      );
       await _load();
     }
   }
 
   Future<void> _paySupplier() async {
-    // دفع للمورد = خصم من الدرج
-    final amount = supplierNeed;
-
-    if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("لا يوجد مؤكد بتكلفة للشراء")));
+    if (supplierNeed <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("لا يوجد منتجات مؤكدة بتكلفة للشراء")));
       return;
     }
 
@@ -135,7 +141,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("دفع للمورد"),
-        content: Text("سيتم تسجيل دفع للمورد بقيمة:\n${fmtMoney(amount)} EGP"),
+        content: Text("سيتم خصم مبلغ تكلفة شراء المؤكد من الدرج:\n${fmtMoney(supplierNeed)} EGP"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("تأكيد")),
@@ -146,8 +152,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (ok == true) {
       await Repo.instance.addCashTxn(
         type: "supplier_purchase",
-        amountEgp: -amount,
-        note: "دفع للمورد (إجمالي تكلفة المؤكد)",
+        amountEgp: -supplierNeed,
+        note: "دفع للمورد (تكلفة المؤكد)",
       );
       await _load();
     }
@@ -160,7 +166,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("إضافة مصروف"),
+        title: const Text("مصروف عام من الدرج"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -186,17 +192,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final v = double.tryParse(amountCtrl.text.trim()) ?? 0;
       if (v <= 0) return;
       await Repo.instance.addCashTxn(type: "expense", amountEgp: -v, note: noteCtrl.text.trim());
-      // ده غير expenses table (مصروفات الطلبات)، ده مصروفات عامة
       await _load();
     }
   }
 
   Future<void> _withdrawProfit() async {
     final amountCtrl = TextEditingController();
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("توزيع/سحب أرباح"),
+        title: const Text("سحب/توزيع أرباح من الدرج"),
         content: TextField(
           controller: amountCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -244,30 +250,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Expanded(
               child: ListView(
                 children: [
-                  _card("رصيد الدرج الحالي", cash, bold: true),
+                  _card("رصيد الدرج الحالي", cashBalance, bold: true),
                   _card("مطلوب دفعه للمورد (تكلفة المؤكد)", supplierNeed, bold: true),
 
-                  const SizedBox(height: 8),
-                  _sectionTitle("الطلبات"),
-                  _small("معلّق: $pendingCount — إجمالي: ${fmtMoney(pendingTotal)}"),
-                  _small("مؤكد: $confirmedCount — إجمالي: ${fmtMoney(confirmedTotal)}"),
-                  _small("ملغي: $cancelledCount — إجمالي: ${fmtMoney(cancelledTotal)}"),
+                  const SizedBox(height: 10),
+                  _title("حالة المنتجات"),
+                  _small("معلّق: $pendingItems — إجمالي بيع (متوقع): ${fmtMoney(pendingTotal)}"),
+                  _small("مؤكد: $confirmedItems — إجمالي بيع: ${fmtMoney(confirmedTotal)}"),
+                  _small("ملغي: $cancelledItems — إجمالي: ${fmtMoney(cancelledTotal)}"),
                   _small("طلبات مُسلّمة: $deliveredOrders"),
 
-                  const SizedBox(height: 8),
-                  _sectionTitle("التحصيل والمصروفات (داخل المدة)"),
+                  const SizedBox(height: 10),
+                  _title("التحصيل والمصروفات (داخل المدة)"),
                   _card("تحصيل العملاء", payments),
-                  _card("مصروفات (شحن/غيره على الطلبات)", expenses),
+                  _card("مصروفات الطلبات (شحن/مصروف)", orderExpenses),
 
-                  const SizedBox(height: 8),
-                  _sectionTitle("الربحية (طلبات مُسلّمة داخل المدة)"),
-                  _card("إيرادات", revenueDelivered),
-                  _card("تكلفة شراء", costDelivered),
+                  const SizedBox(height: 10),
+                  _title("ربحية الطلبات المُسلّمة (داخل المدة)"),
+                  _card("إيرادات", deliveredRevenue),
+                  _card("تكلفة شراء", deliveredCost),
                   _card("ربح إجمالي", grossProfit, bold: true),
                   _card("صافي الربح", netProfit, bold: true),
 
                   const SizedBox(height: 12),
-                  _sectionTitle("حركات سريعة"),
+                  _title("حركات سريعة (الدرج)"),
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
@@ -287,7 +293,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _sectionTitle(String t) => Padding(
+  Widget _title(String t) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Align(
           alignment: Alignment.centerRight,
