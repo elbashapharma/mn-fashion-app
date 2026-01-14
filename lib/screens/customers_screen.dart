@@ -88,7 +88,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
 
     if (ok == true) {
-      await Repo.instance.deleteCustomer(c.id!);
+     try {
+  await Repo.instance.deleteCustomer(c.id!);
+} catch (e) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
+  );
+}
+
       await _load();
     }
   }
