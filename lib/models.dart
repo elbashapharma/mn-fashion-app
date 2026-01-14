@@ -5,14 +5,34 @@ class Customer {
   final int? id;
   final String name;
   final String? whatsapp;
+  final String? deliveryAddress;
+  final int isArchived; // 0 or 1
 
-  Customer({this.id, required this.name, this.whatsapp});
+  Customer({
+    this.id,
+    required this.name,
+    this.whatsapp,
+    this.deliveryAddress,
+    this.isArchived = 0,
+  });
 
-  Map<String, Object?> toMap() => {"id": id, "name": name, "whatsapp": whatsapp};
+  factory Customer.fromMap(Map<String, Object?> m) => Customer(
+        id: (m["id"] as num?)?.toInt(),
+        name: (m["name"] as String?) ?? "",
+        whatsapp: m["whatsapp"] as String?,
+        deliveryAddress: m["delivery_address"] as String?,
+        isArchived: (m["is_archived"] as num?)?.toInt() ?? 0,
+      );
 
-  static Customer fromMap(Map<String, Object?> m) =>
-      Customer(id: m["id"] as int?, name: m["name"] as String, whatsapp: m["whatsapp"] as String?);
+  Map<String, Object?> toMap() => {
+        "id": id,
+        "name": name,
+        "whatsapp": whatsapp,
+        "delivery_address": deliveryAddress,
+        "is_archived": isArchived,
+      };
 }
+
 
 class OrderHeader {
   final int? id;
