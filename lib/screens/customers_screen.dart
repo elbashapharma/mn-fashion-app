@@ -32,47 +32,65 @@ class _CustomersScreenState extends State<CustomersScreen> {
     });
   }
 
-  Future<void> _addCustomer() async {
-    final nameCtrl = TextEditingController();
-    final waCtrl = TextEditingController();
+Future<void> _addCustomer() async {
+  final nameCtrl = TextEditingController();
+  final waCtrl = TextEditingController();
+  final addrCtrl = TextEditingController(); // ✅ جديد
 
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("إضافة عميل"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: "اسم العميل"),
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text("إضافة عميل"),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(labelText: "اسم العميل"),
+          ),
+          TextField(
+            controller: waCtrl,
+            decoration: const InputDecoration(labelText: "واتساب (اختياري)"),
+            keyboardType: TextInputType.phone,
+          ),
+          TextField(
+            controller: addrCtrl,
+            decoration: const InputDecoration(
+              labelText: "عنوان التوصيل (اختياري)",
+              hintText: "المحافظة - المدينة - الشارع - علامة مميزة",
             ),
-            TextField(
-              controller: waCtrl,
-              decoration: const InputDecoration(labelText: "واتساب (اختياري)"),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("حفظ")),
+            maxLines: 2,
+          ),
         ],
       ),
-    );
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("حفظ")),
+      ],
+    ),
+  );
 
-    if (ok == true) {
-      final name = nameCtrl.text.trim();
-      if (name.isEmpty) return;
+  if (ok == true) {
+    final name = nameCtrl.text.trim();
+    if (name.isEmpty) return;
 
+    try {
       await Repo.instance.addCustomer(
         Customer(
           name: name,
           whatsapp: waCtrl.text.trim().isEmpty ? null : waCtrl.text.trim(),
+          deliveryAddress: addrCtrl.text.trim().isEmpty ? null : addrCtrl.text.trim(), // ✅ جديد
         ),
       );
       await _load();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
+      );
     }
   }
+}
+
 
   Future<void> _deleteCustomer(Customer c) async {
     final ok = await showDialog<bool>(
@@ -151,8 +169,21 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   itemBuilder: (ctx, i) {
                     final c = customers[i];
                     return ListTile(
+                      isThreeLine: true,
                       title: Text(c.name),
-                      subtitle: (c.whatsapp ?? "").trim().isEmpty ? null : Text("WhatsApp: ${c.whatsapp}"),
+                    subtitle: (() {
+  final wa = (c.whatsapp ?? "").trim();
+  final addr = (c.deliveryAddress ?? "").trim();
+
+  if (wa.isEmpty && addr.isEmpty) return null;
+
+  final lines = <String>[];
+  if (wa.isNotEmpty) lines.add("WhatsApp: $wa");
+  if (addr.isNotEmpty) lines.add("عنوان: $addr");
+
+  return Text(lines.join("\n"));
+})(),
+                      
                       trailing: PopupMenuButton<String>(
                         onSelected: (v) async {
                           if (v == "orders") {
