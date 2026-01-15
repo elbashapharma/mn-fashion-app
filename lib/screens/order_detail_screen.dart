@@ -278,6 +278,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   children: [
                     Text("الزبون: ${c.name}", style: const TextStyle(fontWeight: FontWeight.bold)),
                     if ((c.whatsapp ?? "").trim().isNotEmpty) Text("واتساب: ${c.whatsapp}"),
+                    if ((c.deliveryAddress ?? "").trim().isNotEmpty)
+                     Text("عنوان التوصيل: ${c.deliveryAddress}"),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 12,
@@ -594,6 +596,8 @@ class _ItemCardState extends State<_ItemCard> {
                 OutlinedButton.icon(
                   onPressed: () async {
                     setState(() => status = ItemStatus.confirmed);
+                    final q = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+                    if (q < 1) qtyCtrl.text = "1";
                     await widget.onChanged(_currentItem());
                   },
                   icon: const Icon(Icons.check_circle_outline),
@@ -623,15 +627,38 @@ class _ItemCardState extends State<_ItemCard> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: TextField(
-                      controller: qtyCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: "الكمية"),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                ],
-              ),
+  child: Row(
+    children: [
+      IconButton(
+        tooltip: "نقص",
+        onPressed: () {
+          final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+          final next = (cur - 1) < 1 ? 1 : (cur - 1);
+          setState(() => qtyCtrl.text = next.toString());
+        },
+        icon: const Icon(Icons.remove_circle_outline),
+      ),
+      Expanded(
+        child: TextField(
+          controller: qtyCtrl,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: "الكمية"),
+          onChanged: (_) => setState(() {}),
+        ),
+      ),
+      IconButton(
+        tooltip: "زيادة",
+        onPressed: () {
+          final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+          final next = cur + 1;
+          setState(() => qtyCtrl.text = next.toString());
+        },
+        icon: const Icon(Icons.add_circle_outline),
+      ),
+    ],
+  ),
+),
+
               const SizedBox(height: 10),
               Card(
                 color: Colors.grey.shade50,
