@@ -243,144 +243,134 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final o = order;
-    final c = customer;
-    if (o == null || c == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+Widget build(BuildContext context) {
+  final o = order;
+  final c = customer;
 
-    final confirmed = items.where((e) => e.status == ItemStatus.confirmed).length;
-    final cancelled = items.where((e) => e.status == ItemStatus.cancelled).length;
-    final pending = items.where((e) => e.status == ItemStatus.pending).length;
-
-    final totalRevenue = _confirmedTotalRevenueEgp();
-    final totalGrossProfit = _confirmedTotalGrossProfitEgp();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("طلب #${o.id} - ${c.name}"),
-        actions: [
-          IconButton(onPressed: _setDefaultRate, icon: const Icon(Icons.currency_exchange), tooltip: "سعر الريال"),
-          IconButton(onPressed: _addShippingExpense, icon: const Icon(Icons.local_shipping_outlined), tooltip: "مصروف شحن"),
-          IconButton(onPressed: _collectPaymentForOrder, icon: const Icon(Icons.payments), tooltip: "تحصيل"),
-          IconButton(onPressed: _markDelivered, icon: const Icon(Icons.check_circle_outline), tooltip: "تم التسليم"),
-          IconButton(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf), tooltip: "PDF"),
-        ],
-      ),
-
-      IconButton(
-  onPressed: () async {
-    final o = order;
-    final c = customer;
-    if (o == null || c == null) return;
-
-    final path = await OrderExporter.exportOrderHtml(
-      customer: c,
-      order: o,
-      items: items,
+  if (o == null || c == null) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
     );
+  }
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("تم تصدير HTML ✅")),
-    );
+  final confirmed = items.where((e) => e.status == ItemStatus.confirmed).length;
+  final cancelled = items.where((e) => e.status == ItemStatus.cancelled).length;
+  final pending = items.where((e) => e.status == ItemStatus.pending).length;
 
-    await OrderExporter.shareFile(path, message: "أمر بيع للعميل: ${c.name} (طلب #${o.id})");
-  },
-  icon: const Icon(Icons.description_outlined),
-  tooltip: "HTML",
-),
+  final totalRevenue = _confirmedTotalRevenueEgp();
+  final totalGrossProfit = _confirmedTotalGrossProfitEgp();
 
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("الزبون: ${c.name}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                    if ((c.whatsapp ?? "").trim().isNotEmpty) Text("واتساب: ${c.whatsapp}"),
-                    if ((c.deliveryAddress ?? "").trim().isNotEmpty)
-                     Text("عنوان التوصيل: ${c.deliveryAddress}"),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 6,
-                      children: [
-                        Chip(label: Text("معلق: $pending")),
-                        Chip(label: Text("مؤكد: $confirmed")),
-                        Chip(label: Text("ملغي: $cancelled")),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "إجمالي الإيرادات (مؤكد): ${fmtMoney(totalRevenue)} EGP",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "إجمالي الربح الإجمالي (مؤكد): ${fmtMoney(totalGrossProfit)} EGP",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      o.deliveredAt == null ? "الحالة: غير مُسلّم" : "الحالة: مُسلّم ✅",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: _addImages,
-                            icon: const Icon(Icons.add_photo_alternate),
-                            label: const Text("إضافة صور"),
-                          ),
+  return Scaffold(
+    appBar: AppBar(
+      title: Text("طلب #${o.id} - ${c.name}"),
+      actions: [
+        IconButton(onPressed: _setDefaultRate, icon: const Icon(Icons.currency_exchange), tooltip: "سعر الريال"),
+        IconButton(onPressed: _addShippingExpense, icon: const Icon(Icons.local_shipping_outlined), tooltip: "مصروف شحن"),
+        IconButton(onPressed: _collectPaymentForOrder, icon: const Icon(Icons.payments), tooltip: "تحصيل"),
+        IconButton(onPressed: _markDelivered, icon: const Icon(Icons.check_circle_outline), tooltip: "تم التسليم"),
+        IconButton(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf), tooltip: "PDF"),
+        IconButton(
+          tooltip: "HTML",
+          icon: const Icon(Icons.description_outlined),
+          onPressed: () async {
+            final path = await OrderExporter.exportOrderHtml(customer: c, order: o, items: items);
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("تم تصدير HTML ✅")),
+            );
+            await OrderExporter.shareFile(path, message: "أمر بيع للعميل: ${c.name} (طلب #${o.id})");
+          },
+        ),
+      ],
+    ),
+    body: Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("الزبون: ${c.name}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                  if ((c.whatsapp ?? "").trim().isNotEmpty) Text("واتساب: ${c.whatsapp}"),
+                  if ((c.deliveryAddress ?? "").trim().isNotEmpty) Text("العنوان: ${c.deliveryAddress}"),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 6,
+                    children: [
+                      Chip(label: Text("معلق: $pending")),
+                      Chip(label: Text("مؤكد: $confirmed")),
+                      Chip(label: Text("ملغي: $cancelled")),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "إجمالي الإيرادات (مؤكد): ${fmtMoney(totalRevenue)} EGP",
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "إجمالي الربح الإجمالي (مؤكد): ${fmtMoney(totalGrossProfit)} EGP",
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    o.deliveredAt == null ? "الحالة: غير مُسلّم" : "الحالة: مُسلّم ✅",
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _addImages,
+                          icon: const Icon(Icons.add_photo_alternate),
+                          label: const Text("إضافة صور"),
                         ),
-                        const SizedBox(width: 10),
-                        OutlinedButton.icon(
-                          onPressed: _exportPdf,
-                          icon: const Icon(Icons.share),
-                          label: const Text("مشاركة PDF"),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text("سعر الريال الافتراضي: ${o.defaultRate}"),
-                  ],
-                ),
+                      ),
+                      const SizedBox(width: 10),
+                      OutlinedButton.icon(
+                        onPressed: _exportPdf,
+                        icon: const Icon(Icons.share),
+                        label: const Text("مشاركة PDF"),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text("سعر الريال الافتراضي: ${o.defaultRate}"),
+                ],
               ),
             ),
           ),
-          Expanded(
-            child: items.isEmpty
-                ? const Center(child: Text("لا يوجد منتجات بعد. اضغط (إضافة صور)."))
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    itemCount: items.length,
-                    itemBuilder: (ctx, i) => _ItemCard(
-                      customer: c,
-                      item: items[i],
-                      onChanged: (updated) async {
-                        await Repo.instance.updateItem(updated);
-                        await _load();
-                      },
-                      onDelete: (id) async {
-                        await Repo.instance.deleteItem(id);
-                        await _load();
-                      },
-                    ),
+        ),
+        Expanded(
+          child: items.isEmpty
+              ? const Center(child: Text("لا يوجد منتجات بعد. اضغط (إضافة صور)."))
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  itemCount: items.length,
+                  itemBuilder: (ctx, i) => _ItemCard(
+                    customer: c,
+                    item: items[i],
+                    onChanged: (updated) async {
+                      await Repo.instance.updateItem(updated);
+                      await _load();
+                    },
+                    onDelete: (id) async {
+                      await Repo.instance.deleteItem(id);
+                      await _load();
+                    },
                   ),
-          ),
-        ],
-      ),
-    );
-  }
+                ),
+        ),
+      ],
+    ),
+  );
 }
+
 
 class _ItemCard extends StatefulWidget {
   final Customer customer;
