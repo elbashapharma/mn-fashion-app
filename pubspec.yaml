@@ -11,6 +11,9 @@ dependencies:
   flutter:
     sdk: flutter
 
+  file_picker: ^8.1.7
+  shared_preferences: ^2.2.3
+
   cupertino_icons: ^1.0.6
 
   # Images & files
