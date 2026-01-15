@@ -104,14 +104,52 @@ class _OrdersScreenState extends State<OrdersScreen> {
       appBar: AppBar(
         title: Text(c == null ? "الطلبات" : "الطلبات - ${c.name}"),
         actions: [
-          IconButton(
-            tooltip: "تحديث",
-            onPressed: _load,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: loading
+  IconButton(
+    tooltip: "تأكيد كل الطلبات المعلقة",
+    icon: const Icon(Icons.done_all),
+    onPressed: () async {
+      final n = await Repo.instance.confirmAllPendingOrdersForCustomer(widget.customerId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("تم تأكيد $n طلب/طلبات ✅")),
+      );
+      await _load();
+    },
+  ),
+  IconButton(
+    tooltip: "دمج المعلق في طلب واحد",
+    icon: const Icon(Icons.merge_type),
+    onPressed: () async {
+      final newId = await Repo.instance.mergePendingOrdersToOneConfirmed(widget.customerId);
+      if (!mounted) return;
+
+      if (newId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("لا توجد طلبات معلقة للدمج")),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("تم الدمج في طلب #$newId ✅")),
+      );
+
+      // افتح الطلب الجديد مباشرة
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: newId)),
+      );
+
+      await _load();
+    },
+  ),
+  IconButton(
+    tooltip: "تحديث",
+    onPressed: _load,
+    icon: const Icon(Icons.refresh),
+  ),
+],
+
           ? const Center(child: CircularProgressIndicator())
           : orders.isEmpty
               ? const Center(child: Text("لا توجد طلبات بعد"))
