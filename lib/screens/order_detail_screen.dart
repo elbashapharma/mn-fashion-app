@@ -207,9 +207,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         shipping: ShippingType.air,
         status: ItemStatus.pending,
         size: null,
-        qty: null,
+        qty: 1, // ✅ مهم جدًا عشان DB NOT NULL
+
       );
-      await Repo.instance.addItem(newItem);
+     try {
+  await Repo.instance.addItem(newItem);
+} catch (e) {
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("خطأ أثناء إضافة الصنف: ${e.toString()}")),
+    );
+  }
+  rethrow;
+}
+
     }
     await _load();
   }
@@ -384,7 +395,7 @@ class _ItemCardState extends State<_ItemCard> {
 
     noteCtrl = TextEditingController(text: it.note ?? "");
     sizeCtrl = TextEditingController(text: it.size ?? "");
-    qtyCtrl = TextEditingController(text: it.qty?.toString() ?? "");
+    qtyCtrl = TextEditingController(text: (it.qty ?? 1).toString());
 
     shipping = it.shipping;
     status = it.status;
@@ -416,7 +427,7 @@ class _ItemCardState extends State<_ItemCard> {
       shipping: shipping,
       status: status,
       size: (status == ItemStatus.confirmed && sizeCtrl.text.trim().isNotEmpty) ? sizeCtrl.text.trim() : null,
-      qty: (status == ItemStatus.confirmed) ? _i(qtyCtrl.text) : null,
+      qty: (status == ItemStatus.confirmed) ? (_i(qtyCtrl.text) <= 0 ? 1 : _i(qtyCtrl.text)) : it.qty,
     );
   }
 
