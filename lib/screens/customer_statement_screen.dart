@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 import "../repo.dart";
 import "../utils.dart";
+import "../statement_export.dart";
 
 class CustomerStatementScreen extends StatefulWidget {
   final int customerId;
@@ -37,7 +38,11 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
     for (final r in rows) {
       final type = r["type"] as String;
       final amount = (r["amount"] as double);
-      if (type == "order") d += amount; else cr += amount;
+      if (type == "order") {
+        d += amount;
+      } else {
+        cr += amount;
+      }
     }
 
     setState(() {
@@ -50,9 +55,10 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
     });
   }
 
-  String _fmtDate(int ms) {
+  String _fmtDateTime(int ms) {
     final dt = DateTime.fromMillisecondsSinceEpoch(ms);
-    return "${dt.year}-${dt.month.toString().padLeft(2,'0')}-${dt.day.toString().padLeft(2,'0')}";
+    String two(int n) => n.toString().padLeft(2, '0');
+    return "${dt.year}-${two(dt.month)}-${two(dt.day)}  ${two(dt.hour)}:${two(dt.minute)}";
   }
 
   @override
@@ -60,12 +66,57 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text("كشف حساب: $customerName"),
-        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+        actions: [
+          IconButton(
+            tooltip: "تحديث",
+            onPressed: _load,
+            icon: const Icon(Icons.refresh),
+          ),
+          IconButton(
+            tooltip: "تصدير HTML",
+            icon: const Icon(Icons.description_outlined),
+            onPressed: ledger.isEmpty
+                ? null
+                : () async {
+                    final path = await StatementExporter.exportHtml(
+                      customerName: customerName,
+                      ledger: ledger,
+                      debit: debit,
+                      credit: credit,
+                      balance: balance,
+                    );
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("تم تصدير الملف ✅\n$path")),
+                    );
+                  },
+          ),
+          IconButton(
+            tooltip: "إرسال واتساب",
+            icon: const Icon(Icons.share),
+            onPressed: ledger.isEmpty
+                ? null
+                : () async {
+                    final path = await StatementExporter.exportHtml(
+                      customerName: customerName,
+                      ledger: ledger,
+                      debit: debit,
+                      credit: credit,
+                      balance: balance,
+                    );
+                    await StatementExporter.shareFile(
+                      path,
+                      message: "كشف حساب: $customerName",
+                    );
+                  },
+          ),
+        ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                // ===== Summary =====
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: Card(
@@ -83,6 +134,8 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
                     ),
                   ),
                 ),
+
+                // ===== Ledger =====
                 Expanded(
                   child: ledger.isEmpty
                       ? const Center(child: Text("لا توجد حركات"))
@@ -92,18 +145,38 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
                           itemBuilder: (ctx, i) {
                             final r = ledger[i];
                             final type = r["type"] as String;
-                            final date = _fmtDate(r["created_at"] as int);
-                            final orderId = r["order_id"];
                             final amount = (r["amount"] as double);
                             final note = (r["note"] ?? "") as String;
+                            final date = _fmtDateTime(r["created_at"] as int);
+                            final orderId = r["order_id"];
+
+                            // 🔹 رصيد تراكمي
+                            double running = 0;
+                            for (int k = 0; k <= i; k++) {
+                              final rr = ledger[k];
+                              final tt = rr["type"] as String;
+                              final aa = (rr["amount"] as double);
+                              running += (tt == "order") ? aa : -aa;
+                            }
 
                             final isDebit = type == "order";
+
                             return ListTile(
-                              title: Text(isDebit ? "أوردر مُسلّم #$orderId" : "دفعة ${orderId == null ? "(تحت الحساب)" : "على أوردر #$orderId"}"),
-                              subtitle: Text("$date  •  $note"),
+                              title: Text(
+                                isDebit
+                                    ? "أوردر مُسلّم #$orderId"
+                                    : "دفعة ${orderId == null ? "(تحت الحساب)" : "على أوردر #$orderId"}",
+                              ),
+                              subtitle: Text(
+                                "$date  •  $note\nالرصيد بعد الحركة: ${fmtMoney(running)} EGP",
+                              ),
+                              isThreeLine: true,
                               trailing: Text(
-                                "${isDebit ? "+" : "-"}${fmtMoney(amount)} EGP",
-                                style: TextStyle(fontWeight: FontWeight.bold, color: isDebit ? Colors.red : Colors.green),
+                                "${isDebit ? "+" : "-"}${fmtMoney(amount)}",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDebit ? Colors.red : Colors.green,
+                                ),
                               ),
                             );
                           },
@@ -117,8 +190,16 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
   Widget _row(String t, double v, {bool bold = false}) {
     return Row(
       children: [
-        Expanded(child: Text(t, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600))),
-        Text("${fmtMoney(v)} EGP", style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600)),
+        Expanded(
+          child: Text(
+            t,
+            style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600),
+          ),
+        ),
+        Text(
+          "${fmtMoney(v)} EGP",
+          style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600),
+        ),
       ],
     );
   }
