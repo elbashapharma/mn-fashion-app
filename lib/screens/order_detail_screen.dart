@@ -7,6 +7,8 @@ import "../utils.dart";
 import "../constants.dart";
 import "../whatsapp.dart";
 import "../pdf_export.dart";
+import "../order_export.dart";
+
 
 class OrderDetailScreen extends StatefulWidget {
   final int orderId;
@@ -266,6 +268,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           IconButton(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf), tooltip: "PDF"),
         ],
       ),
+
+      IconButton(
+  onPressed: () async {
+    final o = order;
+    final c = customer;
+    if (o == null || c == null) return;
+
+    final path = await OrderExporter.exportOrderHtml(
+      customer: c,
+      order: o,
+      items: items,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("تم تصدير HTML ✅")),
+    );
+
+    await OrderExporter.shareFile(path, message: "أمر بيع للعميل: ${c.name} (طلب #${o.id})");
+  },
+  icon: const Icon(Icons.description_outlined),
+  tooltip: "HTML",
+),
+
       body: Column(
         children: [
           Padding(
