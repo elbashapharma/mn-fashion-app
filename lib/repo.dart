@@ -107,18 +107,66 @@ Future<void> archiveCustomer(int customerId) async {
 }
 
 
-  // ---------- Orders ----------
-  Future<int> createOrder(int customerId, double defaultRate) async {
+  Future<int> confirmAllPendingOrdersForCustomer(int customerId) async {
   final d = await AppDb.instance.db;
-  return d.insert("orders", {
-    "customer_id": customerId,
-    "created_at": DateTime.now().millisecondsSinceEpoch,
-    "default_rate": defaultRate,
-    "delivered_at": null,
-    "status": "pending",
-    "merged_into_order_id": null,
+  final updated = await d.update(
+    "orders",
+    {"status": "confirmed"},
+    where: "customer_id=? AND delivered_at IS NULL AND status='pending'",
+    whereArgs: [customerId],
+  );
+  return updated;
+}
+
+Future<int?> mergePendingOrdersToOneConfirmed(int customerId) async {
+  final d = await AppDb.instance.db;
+
+  return await d.transaction<int?>((txn) async {
+    final oldOrders = await txn.query(
+      "orders",
+      where: "customer_id=? AND delivered_at IS NULL AND status='pending'",
+      whereArgs: [customerId],
+      orderBy: "created_at ASC",
+    );
+
+    if (oldOrders.isEmpty) return null;
+
+    final last = oldOrders.last;
+    final defaultRate = (last["default_rate"] as num?)?.toDouble() ?? 0;
+
+    final newOrderId = await txn.insert("orders", {
+      "customer_id": customerId,
+      "created_at": DateTime.now().millisecondsSinceEpoch,
+      "default_rate": defaultRate,
+      "delivered_at": null,
+      "status": "confirmed",
+      "merged_into_order_id": null,
+    });
+
+    for (final o in oldOrders) {
+      final oldId = (o["id"] as num).toInt();
+
+      // نقل المنتجات للطلب الجديد
+      await txn.update(
+        "items",
+        {"order_id": newOrderId},
+        where: "order_id=?",
+        whereArgs: [oldId],
+      );
+
+      // تعليم الطلب القديم أنه merged
+      await txn.update(
+        "orders",
+        {"status": "merged", "merged_into_order_id": newOrderId},
+        where: "id=?",
+        whereArgs: [oldId],
+      );
+    }
+
+    return newOrderId;
   });
 }
+
 Future<int> confirmAllPendingOrdersForCustomer(int customerId) async {
   final d = await AppDb.instance.db;
 
