@@ -588,11 +588,6 @@ Future<double> customerBalance(int customerId) async {
   }
   return null;
 }
-final exists = await Repo.instance.findCustomerByWhatsapp(whatsapp);
-if (exists != null) {
-  // Dialog
-  "العميل موجود مسبقًا: ${exists.name}"
-}
 
 }
 
