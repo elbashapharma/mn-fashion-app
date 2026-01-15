@@ -109,14 +109,81 @@ Future<void> archiveCustomer(int customerId) async {
 
   // ---------- Orders ----------
   Future<int> createOrder(int customerId, double defaultRate) async {
-    final d = await AppDb.instance.db;
-    return d.insert("orders", {
+  final d = await AppDb.instance.db;
+  return d.insert("orders", {
+    "customer_id": customerId,
+    "created_at": DateTime.now().millisecondsSinceEpoch,
+    "default_rate": defaultRate,
+    "delivered_at": null,
+    "status": "pending",
+    "merged_into_order_id": null,
+  });
+}
+Future<int> confirmAllPendingOrdersForCustomer(int customerId) async {
+  final d = await AppDb.instance.db;
+
+  // أكّد كل الطلبات المعلقة غير المسلمة
+  final updated = await d.update(
+    "orders",
+    {"status": "confirmed"},
+    where: "customer_id=? AND delivered_at IS NULL AND status='pending'",
+    whereArgs: [customerId],
+  );
+
+  return updated; // عدد الطلبات اللي اتأكدت
+}
+Future<int?> mergePendingOrdersToOneConfirmed(int customerId) async {
+  final d = await AppDb.instance.db;
+
+  return await d.transaction<int?>( (txn) async {
+    // هات الطلبات المعلقة غير المسلمة
+    final oldOrders = await txn.query(
+      "orders",
+      where: "customer_id=? AND delivered_at IS NULL AND status='pending'",
+      whereArgs: [customerId],
+      orderBy: "created_at ASC",
+    );
+
+    if (oldOrders.isEmpty) return null;
+
+    // استخدم default_rate من أحدث طلب أو أول طلب (اختيار منطقي)
+    final last = oldOrders.last;
+    final defaultRate = (last["default_rate"] as num?)?.toDouble() ?? 0;
+
+    // أنشئ طلب جديد مؤكد
+    final newOrderId = await txn.insert("orders", {
       "customer_id": customerId,
       "created_at": DateTime.now().millisecondsSinceEpoch,
       "default_rate": defaultRate,
       "delivered_at": null,
+      "status": "confirmed",
+      "merged_into_order_id": null,
     });
-  }
+
+    // انقل كل items للطلب الجديد
+    for (final o in oldOrders) {
+      final oldId = (o["id"] as num).toInt();
+
+      await txn.update(
+        "items",
+        {"order_id": newOrderId},
+        where: "order_id=?",
+        whereArgs: [oldId],
+      );
+
+      // علّم الطلب القديم انه merged
+      await txn.update(
+        "orders",
+        {"status": "merged", "merged_into_order_id": newOrderId},
+        where: "id=?",
+        whereArgs: [oldId],
+      );
+    }
+
+    return newOrderId;
+  });
+}
+
 
   Future<List<OrderHeader>> listOrdersForCustomer(int customerId) async {
     final d = await AppDb.instance.db;
