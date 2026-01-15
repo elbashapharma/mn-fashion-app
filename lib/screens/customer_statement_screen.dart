@@ -18,12 +18,31 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
 
   double debit = 0;
   double credit = 0;
-  double balance = 0;
+  double balance = 0; // debit - credit
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  double _balanceDelta(String type, double amount) {
+    // balance = debit - credit
+    // debit increases balance (+)
+    // credit decreases balance (-)
+    switch (type) {
+      case "order":
+      case "expense":
+        return amount; // debit
+      case "payment":
+        return -amount; // credit
+      case "cash":
+        // amount + => cash in (credit) -> reduces balance
+        // amount - => cash out (debit) -> increases balance automatically because -(-x)=+x
+        return -amount;
+      default:
+        return 0;
+    }
   }
 
   Future<void> _load() async {
@@ -38,10 +57,14 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
     for (final r in rows) {
       final type = r["type"] as String;
       final amount = (r["amount"] as double);
-      if (type == "order") {
+
+      if (type == "order" || type == "expense") {
         d += amount;
-      } else {
+      } else if (type == "payment") {
         cr += amount;
+      } else if (type == "cash") {
+        // cash + => credit, cash - => debit
+        if (amount >= 0) cr += amount; else d += (-amount);
       }
     }
 
@@ -59,6 +82,35 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
     final dt = DateTime.fromMillisecondsSinceEpoch(ms);
     String two(int n) => n.toString().padLeft(2, '0');
     return "${dt.year}-${two(dt.month)}-${two(dt.day)}  ${two(dt.hour)}:${two(dt.minute)}";
+  }
+
+  String _titleFor(Map<String, Object?> r) {
+    final type = r["type"] as String;
+    final orderId = r["order_id"];
+    final amount = (r["amount"] as double);
+
+    switch (type) {
+      case "order":
+        return "أوردر مُسلّم #$orderId";
+      case "payment":
+        return "دفعة ${orderId == null ? "(تحت الحساب)" : "على أوردر #$orderId"}";
+      case "expense":
+        return "مصروف ${orderId == null ? "" : "(أوردر #$orderId)"}";
+      case "cash":
+        return "حركة خزنة ${amount >= 0 ? "(دخل)" : "(صرف)"} ${orderId == null ? "" : "— أوردر #$orderId"}";
+      default:
+        return "حركة";
+    }
+  }
+
+  bool _isDebit(Map<String, Object?> r) {
+    final type = r["type"] as String;
+    final amount = (r["amount"] as double);
+
+    if (type == "order" || type == "expense") return true;
+    if (type == "payment") return false;
+    if (type == "cash") return amount < 0; // cash out = debit
+    return false;
   }
 
   @override
@@ -92,7 +144,7 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
                   },
           ),
           IconButton(
-            tooltip: "إرسال واتساب",
+            tooltip: "إرسال",
             icon: const Icon(Icons.share),
             onPressed: ledger.isEmpty
                 ? null
@@ -104,10 +156,7 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
                       credit: credit,
                       balance: balance,
                     );
-                    await StatementExporter.shareFile(
-                      path,
-                      message: "كشف حساب: $customerName",
-                    );
+                    await StatementExporter.shareFile(path, message: "كشف حساب: $customerName");
                   },
           ),
         ],
@@ -116,7 +165,6 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // ===== Summary =====
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: Card(
@@ -124,9 +172,9 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
                       padding: const EdgeInsets.all(12),
                       child: Column(
                         children: [
-                          _row("إجمالي مدين (طلبات مُسلّمة)", debit),
+                          _row("إجمالي مدين (طلبات/مصروفات)", debit),
                           const SizedBox(height: 6),
-                          _row("إجمالي دائن (مدفوعات)", credit),
+                          _row("إجمالي دائن (مدفوعات/دخل خزنة)", credit),
                           const Divider(),
                           _row("الرصيد", balance, bold: true),
                         ],
@@ -134,8 +182,6 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
                     ),
                   ),
                 ),
-
-                // ===== Ledger =====
                 Expanded(
                   child: ledger.isEmpty
                       ? const Center(child: Text("لا توجد حركات"))
@@ -144,35 +190,36 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
                           separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (ctx, i) {
                             final r = ledger[i];
-                            final type = r["type"] as String;
                             final amount = (r["amount"] as double);
-                            final note = (r["note"] ?? "") as String;
+                            final note = ((r["note"] ?? "") as String).trim();
                             final date = _fmtDateTime(r["created_at"] as int);
-                            final orderId = r["order_id"];
 
-                            // 🔹 رصيد تراكمي
+                            // running balance
                             double running = 0;
                             for (int k = 0; k <= i; k++) {
                               final rr = ledger[k];
                               final tt = rr["type"] as String;
                               final aa = (rr["amount"] as double);
-                              running += (tt == "order") ? aa : -aa;
+                              running += _balanceDelta(tt, aa);
                             }
 
-                            final isDebit = type == "order";
+                            final isDebit = _isDebit(r);
+                            final title = _titleFor(r);
+
+                            // display amount sign:
+                            // - cash: keep natural sign for clarity
+                            final displayAmount = (r["type"] == "cash")
+                                ? "${amount >= 0 ? "+" : "-"}${fmtMoney(amount.abs())}"
+                                : "${isDebit ? "+" : "-"}${fmtMoney(amount)}";
 
                             return ListTile(
-                              title: Text(
-                                isDebit
-                                    ? "أوردر مُسلّم #$orderId"
-                                    : "دفعة ${orderId == null ? "(تحت الحساب)" : "على أوردر #$orderId"}",
-                              ),
-                              subtitle: Text(
-                                "$date  •  $note\nالرصيد بعد الحركة: ${fmtMoney(running)} EGP",
-                              ),
                               isThreeLine: true,
+                              title: Text(title),
+                              subtitle: Text(
+                                "$date${note.isEmpty ? "" : "  •  $note"}\nالرصيد بعد الحركة: ${fmtMoney(running)} EGP",
+                              ),
                               trailing: Text(
-                                "${isDebit ? "+" : "-"}${fmtMoney(amount)}",
+                                "$displayAmount EGP",
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: isDebit ? Colors.red : Colors.green,
@@ -190,16 +237,8 @@ class _CustomerStatementScreenState extends State<CustomerStatementScreen> {
   Widget _row(String t, double v, {bool bold = false}) {
     return Row(
       children: [
-        Expanded(
-          child: Text(
-            t,
-            style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600),
-          ),
-        ),
-        Text(
-          "${fmtMoney(v)} EGP",
-          style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600),
-        ),
+        Expanded(child: Text(t, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600))),
+        Text("${fmtMoney(v)} EGP", style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.w600)),
       ],
     );
   }
