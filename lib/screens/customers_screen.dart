@@ -1,12 +1,13 @@
 import "package:flutter/material.dart";
+
 import "../repo.dart";
 import "../models.dart";
+
 import "orders_screen.dart";
 import "customer_finance_screen.dart";
 import "profit_report_screen.dart";
 import "dashboard_screen.dart";
 import "backups_screen.dart";
-
 
 class CustomersScreen extends StatefulWidget {
   const CustomersScreen({super.key});
@@ -28,51 +29,50 @@ class _CustomersScreenState extends State<CustomersScreen> {
   Future<void> _load() async {
     setState(() => loading = true);
     final list = await Repo.instance.listCustomers();
+    if (!mounted) return;
     setState(() {
       customers = list;
       loading = false;
     });
   }
 
-Future<void> _addCustomer() async {
-  final nameCtrl = TextEditingController();
-  final waCtrl = TextEditingController();
-  final addrCtrl = TextEditingController(); // ✅ جديد
+  Future<void> _addCustomer() async {
+    final nameCtrl = TextEditingController();
+    final waCtrl = TextEditingController();
+    final addrCtrl = TextEditingController();
 
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text("إضافة عميل"),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: nameCtrl,
-            decoration: const InputDecoration(labelText: "اسم العميل"),
-          ),
-          TextField(
-            controller: waCtrl,
-            decoration: const InputDecoration(labelText: "واتساب (اختياري)"),
-            keyboardType: TextInputType.phone,
-          ),
-          TextField(
-            controller: addrCtrl,
-            decoration: const InputDecoration(
-              labelText: "عنوان التوصيل (اختياري)",
-              hintText: "المحافظة - المدينة - الشارع - علامة مميزة",
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("إضافة عميل"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: "اسم العميل"),
             ),
-            maxLines: 2,
-          ),
+            TextField(
+              controller: waCtrl,
+              decoration: const InputDecoration(labelText: "واتساب (اختياري)"),
+              keyboardType: TextInputType.phone,
+              textDirection: TextDirection.ltr,
+            ),
+            TextField(
+              controller: addrCtrl,
+              decoration: const InputDecoration(labelText: "عنوان التوصيل (اختياري)"),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("حفظ")),
         ],
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("حفظ")),
-      ],
-    ),
-  );
+    );
 
-  if (ok == true) {
+    if (ok != true) return;
+
     final name = nameCtrl.text.trim();
     if (name.isEmpty) return;
 
@@ -81,18 +81,17 @@ Future<void> _addCustomer() async {
         Customer(
           name: name,
           whatsapp: waCtrl.text.trim().isEmpty ? null : waCtrl.text.trim(),
-          deliveryAddress: addrCtrl.text.trim().isEmpty ? null : addrCtrl.text.trim(), // ✅ جديد
+          deliveryAddress: addrCtrl.text.trim().isEmpty ? null : addrCtrl.text.trim(),
         ),
       );
       await _load();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
       );
     }
   }
-}
-
 
   Future<void> _deleteCustomer(Customer c) async {
     final ok = await showDialog<bool>(
@@ -107,41 +106,46 @@ Future<void> _addCustomer() async {
       ),
     );
 
-    if (ok == true) {
-     try {
-  await Repo.instance.deleteCustomer(c.id!);
-} catch (e) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
-  );
-}
+    if (ok != true) return;
 
-      await _load();
+    try {
+      await Repo.instance.deleteCustomer(c.id!);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
+      );
     }
+
+    await _load();
   }
 
   @override
   Widget build(BuildContext context) {
-   return Scaffold(
-  appBar: AppBar(
-    title: const Text("العملاء"),
-    actions: [
-      IconButton(
-        icon: const Icon(Icons.backup_outlined),
-        tooltip: "النسخ الاحتياطي",
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const BackupsScreen()),
-          );
-        },
-      ),
-    ],
-  ),
-  body: ...
-);
-
-          // ✅ Profit report
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("العملاء"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.backup_outlined),
+            tooltip: "Backups",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BackupsScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.dashboard),
+            tooltip: "Dashboard",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DashboardScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.bar_chart),
             tooltip: "تقرير الأرباح",
@@ -152,7 +156,6 @@ Future<void> _addCustomer() async {
               );
             },
           ),
-
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: "تحديث",
@@ -173,22 +176,18 @@ Future<void> _addCustomer() async {
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (ctx, i) {
                     final c = customers[i];
+
+                    final wa = (c.whatsapp ?? "").trim();
+                    final addr = (c.deliveryAddress ?? "").trim();
+
+                    final subtitleLines = <String>[];
+                    if (wa.isNotEmpty) subtitleLines.add("WhatsApp: $wa");
+                    if (addr.isNotEmpty) subtitleLines.add("Address: $addr");
+
                     return ListTile(
-                      isThreeLine: true,
                       title: Text(c.name),
-                    subtitle: (() {
-  final wa = (c.whatsapp ?? "").trim();
-  final addr = (c.deliveryAddress ?? "").trim();
-
-  if (wa.isEmpty && addr.isEmpty) return null;
-
-  final lines = <String>[];
-  if (wa.isNotEmpty) lines.add("WhatsApp: $wa");
-  if (addr.isNotEmpty) lines.add("عنوان: $addr");
-
-  return Text(lines.join("\n"));
-})(),
-                      
+                      isThreeLine: subtitleLines.length > 1,
+                      subtitle: subtitleLines.isEmpty ? null : Text(subtitleLines.join("\n")),
                       trailing: PopupMenuButton<String>(
                         onSelected: (v) async {
                           if (v == "orders") {
