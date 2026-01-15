@@ -3,9 +3,39 @@ import "package:path/path.dart" as p;
 import "package:path_provider/path_provider.dart";
 import "package:share_plus/share_plus.dart";
 import "models.dart";
+import "dart:convert";
+
 
 class OrderExporter {
   static String _fmtMoney(num v) => v.toDouble().toStringAsFixed(2);
+
+  static String _mimeFromPath(String path) {
+  final p = path.toLowerCase();
+  if (p.endsWith(".png")) return "image/png";
+  if (p.endsWith(".webp")) return "image/webp";
+  return "image/jpeg"; // default for jpg/jpeg
+}
+
+static Future<String> _imgDataUri(String filePath) async {
+  try {
+    final f = File(filePath);
+    if (!await f.exists()) return "";
+    final bytes = await f.readAsBytes();
+    final b64 = base64Encode(bytes);
+    final mime = _mimeFromPath(filePath);
+    return "data:$mime;base64,$b64";
+  } catch (_) {
+    return "";
+  }
+}
+
+static Future<String> _imgCellHtml(String filePath) async {
+  final uri = await _imgDataUri(filePath);
+  if (uri.isEmpty) return "<div style='color:#999;font-size:12px'>لا توجد صورة</div>";
+  return """
+<img src="$uri" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #ddd;" />
+""";
+}
 
   static String _escapeHtml(String s) {
     return s
@@ -44,12 +74,32 @@ class OrderExporter {
     final totalGross = confirmed.fold<double>(0, (p, e) => p + e.grossProfitEgp);
 
     final rows = <String>[];
-    for (final it in items) {
-      final qty = (it.qty ?? 0);
-      final unitSell = (it.priceSar * it.rateEgp) + it.profitEgp;
-      final lineTotal = unitSell * qty;
+for (final it in items) {
+  final qty = (it.qty ?? 0);
+  final unitSell = (it.priceSar * it.rateEgp) + it.profitEgp;
+  final lineTotal = unitSell * qty;
 
-      rows.add("""
+  final imgCell = await _imgCellHtml(it.imagePath);
+
+  rows.add("""
+<tr>
+  <td>$imgCell</td>
+  <td>${it.id ?? "-"}</td>
+  <td>${_escapeHtml(it.note ?? "")}</td>
+  <td>${_escapeHtml(_statusLabel(it.status))}</td>
+  <td>${_escapeHtml(_shipLabel(it.shipping))}</td>
+  <td>${_escapeHtml(it.size ?? "-")}</td>
+  <td style="text-align:right;">$qty</td>
+  <td style="text-align:right;">${_fmtMoney(it.buyPriceSar)}</td>
+  <td style="text-align:right;">${_fmtMoney(it.priceSar)}</td>
+  <td style="text-align:right;">${_fmtMoney(it.rateEgp)}</td>
+  <td style="text-align:right;">${_fmtMoney(it.profitEgp)}</td>
+  <td style="text-align:right;">${_fmtMoney(unitSell)}</td>
+  <td style="text-align:right;">${_fmtMoney(lineTotal)}</td>
+</tr>
+""");
+}
+""
 <tr>
   <td>${it.id ?? "-"}</td>
   <td>${_escapeHtml(it.note ?? "")}</td>
