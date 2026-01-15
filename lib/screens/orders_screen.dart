@@ -38,19 +38,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   String _fmtRate(num? v) {
     final x = (v ?? 0).toDouble();
-    // 2 decimals max without intl
     final s = x.toStringAsFixed(2);
-    // remove trailing .00
     return s.endsWith(".00") ? s.substring(0, s.length - 3) : s;
   }
 
   String _fmtDate(dynamic createdAt) {
-    // لو createdAt عندك String في DB زي "2026-01-15 12:30"
-    // نعرضها بشكل لطيف بدون intl
     final s = (createdAt ?? "").toString().trim();
     if (s.isEmpty) return "-";
 
-    // حاول parse ISO
     final dt = DateTime.tryParse(s.replaceAll(" ", "T"));
     if (dt == null) return s;
 
@@ -68,7 +63,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         content: TextField(
           controller: rateCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          textDirection: TextDirection.ltr, // مهم عشان الأرقام ما تتقلبش
+          textDirection: TextDirection.ltr,
           decoration: const InputDecoration(
             labelText: "سعر الريال الافتراضي (يمكن تغييره لكل منتج)",
             hintText: "مثال: 13.5",
@@ -83,7 +78,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
     if (ok == true) {
       final rate = double.tryParse(rateCtrl.text.trim().replaceAll(",", ".")) ?? 0;
-
       final id = await Repo.instance.createOrder(widget.customerId, rate);
 
       if (!mounted) return;
@@ -91,9 +85,40 @@ class _OrdersScreenState extends State<OrdersScreen> {
         context,
         MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: id)),
       );
-
       await _load();
     }
+  }
+
+  Future<void> _confirmAll() async {
+    final n = await Repo.instance.confirmAllPendingOrdersForCustomer(widget.customerId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("تم تأكيد $n طلب/طلبات ✅")),
+    );
+    await _load();
+  }
+
+  Future<void> _mergeAll() async {
+    final newId = await Repo.instance.mergePendingOrdersToOneConfirmed(widget.customerId);
+    if (!mounted) return;
+
+    if (newId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("لا توجد طلبات معلقة للدمج")),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("تم الدمج في طلب #$newId ✅")),
+    );
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: newId)),
+    );
+
+    await _load();
   }
 
   @override
@@ -104,52 +129,24 @@ class _OrdersScreenState extends State<OrdersScreen> {
       appBar: AppBar(
         title: Text(c == null ? "الطلبات" : "الطلبات - ${c.name}"),
         actions: [
-  IconButton(
-    tooltip: "تأكيد كل الطلبات المعلقة",
-    icon: const Icon(Icons.done_all),
-    onPressed: () async {
-      final n = await Repo.instance.confirmAllPendingOrdersForCustomer(widget.customerId);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("تم تأكيد $n طلب/طلبات ✅")),
-      );
-      await _load();
-    },
-  ),
-  IconButton(
-    tooltip: "دمج المعلق في طلب واحد",
-    icon: const Icon(Icons.merge_type),
-    onPressed: () async {
-      final newId = await Repo.instance.mergePendingOrdersToOneConfirmed(widget.customerId);
-      if (!mounted) return;
-
-      if (newId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("لا توجد طلبات معلقة للدمج")),
-        );
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("تم الدمج في طلب #$newId ✅")),
-      );
-
-      // افتح الطلب الجديد مباشرة
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: newId)),
-      );
-
-      await _load();
-    },
-  ),
-  IconButton(
-    tooltip: "تحديث",
-    onPressed: _load,
-    icon: const Icon(Icons.refresh),
-  ),
-],
-
+          IconButton(
+            tooltip: "تأكيد كل الطلبات المعلقة",
+            icon: const Icon(Icons.done_all),
+            onPressed: _confirmAll,
+          ),
+          IconButton(
+            tooltip: "دمج المعلق في طلب واحد",
+            icon: const Icon(Icons.merge_type),
+            onPressed: _mergeAll,
+          ),
+          IconButton(
+            tooltip: "تحديث",
+            onPressed: _load,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
+      body: loading
           ? const Center(child: CircularProgressIndicator())
           : orders.isEmpty
               ? const Center(child: Text("لا توجد طلبات بعد"))
@@ -160,9 +157,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     final o = orders[i];
                     return ListTile(
                       title: Text("طلب #${o.id ?? "-"}"),
-                      subtitle: Text(
-                        "تاريخ: ${_fmtDate(o.createdAt)}  |  سعر الريال: ${_fmtRate(o.defaultRate)}",
-                      ),
+                      subtitle: Text("تاريخ: ${_fmtDate(o.createdAt)}  |  سعر الريال: ${_fmtRate(o.defaultRate)}"),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () async {
                         if (o.id == null) return;
