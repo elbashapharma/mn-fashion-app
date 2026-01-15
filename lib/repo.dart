@@ -108,10 +108,67 @@ Future<void> archiveCustomer(int customerId) async {
 
 
 
+// ---------- Orders ----------
+Future<int> createOrder(int customerId, double defaultRate) async {
+  final d = await AppDb.instance.db;
+  return d.insert("orders", {
+    "customer_id": customerId,
+    "created_at": DateTime.now().millisecondsSinceEpoch,
+    "default_rate": defaultRate,
+    "delivered_at": null,
+    "status": "pending",
+    "merged_into_order_id": null,
+  });
+}
+
+Future<List<OrderHeader>> listOrdersForCustomer(int customerId) async {
+  final d = await AppDb.instance.db;
+  final res = await d.query(
+    "orders",
+    where: "customer_id=?",
+    whereArgs: [customerId],
+    orderBy: "created_at DESC",
+  );
+  return res.map(OrderHeader.fromMap).toList();
+}
+
+Future<OrderHeader> getOrder(int id) async {
+  final d = await AppDb.instance.db;
+  final res = await d.query("orders", where: "id=?", whereArgs: [id]);
+  return OrderHeader.fromMap(res.first);
+}
+
+Future<void> updateOrderDefaultRate(int orderId, double rate) async {
+  final d = await AppDb.instance.db;
+  await d.update("orders", {"default_rate": rate}, where: "id=?", whereArgs: [orderId]);
+}
+
+Future<void> markOrderDelivered(int orderId) async {
+  final d = await AppDb.instance.db;
+  await d.update(
+    "orders",
+    {"delivered_at": DateTime.now().millisecondsSinceEpoch},
+    where: "id=?",
+    whereArgs: [orderId],
+  );
+}
+
+// ✅ Confirm All
+Future<int> confirmAllPendingOrdersForCustomer(int customerId) async {
+  final d = await AppDb.instance.db;
+  return d.update(
+    "orders",
+    {"status": "confirmed"},
+    where: "customer_id=? AND delivered_at IS NULL AND status='pending'",
+    whereArgs: [customerId],
+  );
+}
+
+// ✅ Merge pending into one confirmed
 Future<int?> mergePendingOrdersToOneConfirmed(int customerId) async {
   final d = await AppDb.instance.db;
 
-  return await d.transaction<int?>((txn) async {
+  return d.transaction<int?>((txn) async {
     final oldOrders = await txn.query(
       "orders",
       where: "customer_id=? AND delivered_at IS NULL AND status='pending'",
@@ -136,7 +193,6 @@ Future<int?> mergePendingOrdersToOneConfirmed(int customerId) async {
     for (final o in oldOrders) {
       final oldId = (o["id"] as num).toInt();
 
-      // نقل المنتجات للطلب الجديد
       await txn.update(
         "items",
         {"order_id": newOrderId},
@@ -144,7 +200,6 @@ Future<int?> mergePendingOrdersToOneConfirmed(int customerId) async {
         whereArgs: [oldId],
       );
 
-      // تعليم الطلب القديم أنه merged
       await txn.update(
         "orders",
         {"status": "merged", "merged_into_order_id": newOrderId},
@@ -156,94 +211,6 @@ Future<int?> mergePendingOrdersToOneConfirmed(int customerId) async {
     return newOrderId;
   });
 }
-
-Future<int> confirmAllPendingOrdersForCustomer(int customerId) async {
-  final d = await AppDb.instance.db;
-
-  // أكّد كل الطلبات المعلقة غير المسلمة
-  final updated = await d.update(
-    "orders",
-    {"status": "confirmed"},
-    where: "customer_id=? AND delivered_at IS NULL AND status='pending'",
-    whereArgs: [customerId],
-  );
-
-  return updated; // عدد الطلبات اللي اتأكدت
-}
-
-    if (oldOrders.isEmpty) return null;
-
-    // استخدم default_rate من أحدث طلب أو أول طلب (اختيار منطقي)
-    final last = oldOrders.last;
-    final defaultRate = (last["default_rate"] as num?)?.toDouble() ?? 0;
-
-    // أنشئ طلب جديد مؤكد
-    final newOrderId = await txn.insert("orders", {
-      "customer_id": customerId,
-      "created_at": DateTime.now().millisecondsSinceEpoch,
-      "default_rate": defaultRate,
-      "delivered_at": null,
-      "status": "confirmed",
-      "merged_into_order_id": null,
-    });
-
-    // انقل كل items للطلب الجديد
-    for (final o in oldOrders) {
-      final oldId = (o["id"] as num).toInt();
-
-      await txn.update(
-        "items",
-        {"order_id": newOrderId},
-        where: "order_id=?",
-        whereArgs: [oldId],
-      );
-
-      // علّم الطلب القديم انه merged
-      await txn.update(
-        "orders",
-        {"status": "merged", "merged_into_order_id": newOrderId},
-        where: "id=?",
-        whereArgs: [oldId],
-      );
-    }
-
-    return newOrderId;
-  });
-}
-
-
-  Future<List<OrderHeader>> listOrdersForCustomer(int customerId) async {
-    final d = await AppDb.instance.db;
-    final res = await d.query(
-      "orders",
-      where: "customer_id=?",
-      whereArgs: [customerId],
-      orderBy: "created_at DESC",
-    );
-    return res.map(OrderHeader.fromMap).toList();
-  }
-
-  Future<OrderHeader> getOrder(int id) async {
-    final d = await AppDb.instance.db;
-    final res = await d.query("orders", where: "id=?", whereArgs: [id]);
-    return OrderHeader.fromMap(res.first);
-  }
-
-  Future<void> updateOrderDefaultRate(int orderId, double rate) async {
-    final d = await AppDb.instance.db;
-    await d.update("orders", {"default_rate": rate}, where: "id=?", whereArgs: [orderId]);
-  }
-
-  // ✅ زر التسليم
-  Future<void> markOrderDelivered(int orderId) async {
-    final d = await AppDb.instance.db;
-    await d.update(
-      "orders",
-      {"delivered_at": DateTime.now().millisecondsSinceEpoch},
-      where: "id=?",
-      whereArgs: [orderId],
-    );
-  }
 
   // ---------- Items ----------
   Future<List<OrderItem>> listItems(int orderId) async {
