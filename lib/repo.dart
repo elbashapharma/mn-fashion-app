@@ -675,7 +675,7 @@ Future<bool> customerHasOrders(int customerId) async {
 
 // رصيد العميل
 Future<double> customerBalance(int customerId) async {
-  final revenue = await customerDeliveredRevenue(customerId);
+  final revenue = await sumRevenueForCustomerDelivered(customerId);
   final paid = await sumPaymentsForCustomer(customerId);
   return revenue - paid;
 }
