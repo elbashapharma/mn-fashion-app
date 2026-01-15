@@ -107,16 +107,6 @@ Future<void> archiveCustomer(int customerId) async {
 }
 
 
-  Future<int> confirmAllPendingOrdersForCustomer(int customerId) async {
-  final d = await AppDb.instance.db;
-  final updated = await d.update(
-    "orders",
-    {"status": "confirmed"},
-    where: "customer_id=? AND delivered_at IS NULL AND status='pending'",
-    whereArgs: [customerId],
-  );
-  return updated;
-}
 
 Future<int?> mergePendingOrdersToOneConfirmed(int customerId) async {
   final d = await AppDb.instance.db;
@@ -180,17 +170,6 @@ Future<int> confirmAllPendingOrdersForCustomer(int customerId) async {
 
   return updated; // عدد الطلبات اللي اتأكدت
 }
-Future<int?> mergePendingOrdersToOneConfirmed(int customerId) async {
-  final d = await AppDb.instance.db;
-
-  return await d.transaction<int?>( (txn) async {
-    // هات الطلبات المعلقة غير المسلمة
-    final oldOrders = await txn.query(
-      "orders",
-      where: "customer_id=? AND delivered_at IS NULL AND status='pending'",
-      whereArgs: [customerId],
-      orderBy: "created_at ASC",
-    );
 
     if (oldOrders.isEmpty) return null;
 
