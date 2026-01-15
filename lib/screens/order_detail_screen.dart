@@ -209,7 +209,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         shipping: ShippingType.air,
         status: ItemStatus.pending,
         size: null,
-        qty: 1, // ✅ default 1
+        qty: 1,
       );
       await Repo.instance.addItem(newItem);
     }
@@ -217,15 +217,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   double _confirmedTotalRevenueEgp() {
-    return items
-        .where((e) => e.status == ItemStatus.confirmed)
-        .fold<double>(0, (p, e) => p + e.revenueEgp);
+    return items.where((e) => e.status == ItemStatus.confirmed).fold<double>(0, (p, e) => p + e.revenueEgp);
   }
 
   double _confirmedTotalGrossProfitEgp() {
-    return items
-        .where((e) => e.status == ItemStatus.confirmed)
-        .fold<double>(0, (p, e) => p + e.grossProfitEgp);
+    return items.where((e) => e.status == ItemStatus.confirmed).fold<double>(0, (p, e) => p + e.grossProfitEgp);
   }
 
   Future<void> _exportPdf() async {
@@ -526,14 +522,12 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
-
             const SizedBox(height: 10),
             TextField(
               controller: noteCtrl,
               decoration: const InputDecoration(labelText: "ملاحظة (اختياري) مثل اسم/وصف المنتج"),
               onChanged: (_) => setState(() {}),
             ),
-
             const SizedBox(height: 10),
             Row(
               children: [
@@ -556,7 +550,6 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
-
             const SizedBox(height: 10),
             Row(
               children: [
@@ -579,7 +572,6 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
-
             const SizedBox(height: 10),
             Row(
               children: [
@@ -595,7 +587,6 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
-
             const SizedBox(height: 10),
             Row(
               children: [
@@ -632,7 +623,6 @@ class _ItemCardState extends State<_ItemCard> {
                 ),
               ],
             ),
-
             if (status == ItemStatus.confirmed) ...[
               const SizedBox(height: 10),
               Row(
