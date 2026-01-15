@@ -1,4 +1,5 @@
 import "dart:async";
+import "dart:io";
 import "package:path/path.dart" as p;
 import "package:path_provider/path_provider.dart";
 import "package:sqflite/sqflite.dart";
@@ -345,5 +346,43 @@ class AppDb {
         await db.execute("INSERT OR IGNORE INTO suppliers(name) VALUES ('Shein');");
       },
     );
+  }
+
+  // =========================
+  // Backup / Restore helpers
+  // =========================
+
+  // ✅ يرجّع مسار ملف قاعدة البيانات
+  Future<String> getDbFilePath() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return p.join(dir.path, "shein_pricing.db");
+  }
+
+  // ✅ يقفل قاعدة البيانات (ضروري قبل الاسترجاع)
+  Future<void> closeDb() async {
+    if (_db != null) {
+      await _db!.close();
+      _db = null;
+    }
+  }
+
+  // ✅ Restore: استبدال DB بملف نسخة احتياطية
+  Future<void> restoreFromFile(String sourceDbPath) async {
+    await closeDb();
+
+    final targetPath = await getDbFilePath();
+    final src = File(sourceDbPath);
+
+    if (!await src.exists()) {
+      throw Exception("ملف النسخة الاحتياطية غير موجود");
+    }
+
+    final dst = File(targetPath);
+    await dst.parent.create(recursive: true);
+
+    await src.copy(targetPath);
+
+    _db = null;
+    await db;
   }
 }
