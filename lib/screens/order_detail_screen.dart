@@ -615,69 +615,69 @@ class _ItemCardState extends State<_ItemCard> {
               ],
             ),
             if (status == ItemStatus.confirmed) ...[
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: sizeCtrl,
-                      decoration: const InputDecoration(labelText: "المقاس"),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-  child: Row(
+  const SizedBox(height: 10),
+  Row(
     children: [
-      IconButton(
-        tooltip: "نقص",
-        onPressed: () {
-          final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
-          final next = (cur - 1) < 1 ? 1 : (cur - 1);
-          setState(() => qtyCtrl.text = next.toString());
-        },
-        icon: const Icon(Icons.remove_circle_outline),
-      ),
       Expanded(
         child: TextField(
-          controller: qtyCtrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: "الكمية"),
+          controller: sizeCtrl,
+          decoration: const InputDecoration(labelText: "المقاس"),
           onChanged: (_) => setState(() {}),
         ),
       ),
-      IconButton(
-        tooltip: "زيادة",
-        onPressed: () {
-          final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
-          final next = cur + 1;
-          setState(() => qtyCtrl.text = next.toString());
-        },
-        icon: const Icon(Icons.add_circle_outline),
-      ),
-    ],
-  ),
-),
+      const SizedBox(width: 10),
 
-              const SizedBox(height: 10),
-              Card(
-                color: Colors.grey.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("إيراد الصنف: ${fmtMoney(revenue)} EGP"),
-                      Text("تكلفة الصنف: ${fmtMoney(cost)} EGP"),
-                      Text("الربح الإجمالي: ${fmtMoney(gross)} EGP", style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
+      // ✅ qty with + / -
+      Expanded(
+        child: Row(
+          children: [
+            IconButton(
+              tooltip: "نقص",
+              onPressed: () {
+                final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+                final next = (cur - 1) < 1 ? 1 : (cur - 1);
+                setState(() => qtyCtrl.text = next.toString());
+              },
+              icon: const Icon(Icons.remove_circle_outline),
+            ),
+            Expanded(
+              child: TextField(
+                controller: qtyCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "الكمية"),
+                onChanged: (_) => setState(() {}),
               ),
-            ],
+            ),
+            IconButton(
+              tooltip: "زيادة",
+              onPressed: () {
+                final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+                final next = cur + 1;
+                setState(() => qtyCtrl.text = next.toString());
+              },
+              icon: const Icon(Icons.add_circle_outline),
+            ),
           ],
         ),
       ),
-    );
-  }
-}
+    ],
+  ),
+  const SizedBox(height: 10),
+  Card(
+    color: Colors.grey.shade50,
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("إيراد الصنف: ${fmtMoney(revenue)} EGP"),
+          Text("تكلفة الصنف: ${fmtMoney(cost)} EGP"),
+          Text(
+            "الربح الإجمالي: ${fmtMoney(gross)} EGP",
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    ),
+  ),
+],
