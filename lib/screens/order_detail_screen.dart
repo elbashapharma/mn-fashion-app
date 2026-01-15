@@ -447,237 +447,262 @@ class _ItemCardState extends State<_ItemCard> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final it = _currentItem();
+Widget build(BuildContext context) {
+  final it = _currentItem();
 
-    final unitSell = (it.priceSar * it.rateEgp) + it.profitEgp;
-    final unitCost = (it.buyPriceSar * it.rateEgp);
+  final unitSell = (it.priceSar * it.rateEgp) + it.profitEgp;
+  final unitCost = (it.buyPriceSar * it.rateEgp);
 
-    final revenue = it.revenueEgp;
-    final cost = it.costEgp;
-    final gross = it.grossProfitEgp;
+  final revenue = it.revenueEgp;
+  final cost = it.costEgp;
+  final gross = it.grossProfitEgp;
 
-    Color statusColor;
-    String statusText;
-    switch (status) {
-      case ItemStatus.confirmed:
-        statusColor = Colors.green;
-        statusText = "مؤكد";
-        break;
-      case ItemStatus.cancelled:
-        statusColor = Colors.red;
-        statusText = "ملغي";
-        break;
-      default:
-        statusColor = Colors.orange;
-        statusText = "معلق";
-    }
+  Color statusColor;
+  String statusText;
+  switch (status) {
+    case ItemStatus.confirmed:
+      statusColor = Colors.green;
+      statusText = "مؤكد";
+      break;
+    case ItemStatus.cancelled:
+      statusColor = Colors.red;
+      statusText = "ملغي";
+      break;
+    default:
+      statusColor = Colors.orange;
+      statusText = "معلق";
+  }
 
-    final days = shipping == ShippingType.air ? AppConstants.shippingDaysAir : AppConstants.shippingDaysLand;
+  final days = shipping == ShippingType.air ? AppConstants.shippingDaysAir : AppConstants.shippingDaysLand;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(File(widget.item.imagePath), width: 86, height: 86, fit: BoxFit.cover),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("منتج #${widget.item.id}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(color: statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(999)),
-                        child: Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
-                      ),
-                      const SizedBox(height: 6),
-                      Text("بيع/قطعة: ${fmtMoney(unitSell)} EGP", style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text("شراء/قطعة: ${fmtMoney(unitCost)} EGP"),
-                      Text("مدة الوصول: $days يوم"),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () async => widget.onDelete(widget.item.id!),
-                  icon: const Icon(Icons.delete_outline),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: noteCtrl,
-              decoration: const InputDecoration(labelText: "ملاحظة (اختياري) مثل اسم/وصف المنتج"),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: buySarCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: "سعر الشراء بالريال (Buy SAR)"),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: sellSarCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: "سعر البيع بالريال (Sell SAR)"),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: rateCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: "سعر الريال بالجنيه"),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: extraProfitCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: "ربح إضافي/قطعة (جنيه)"),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: SegmentedButton<ShippingType>(
-                    segments: const [
-                      ButtonSegment(value: ShippingType.air, label: Text("جوي (20 يوم)"), icon: Icon(Icons.flight_takeoff)),
-                      ButtonSegment(value: ShippingType.land, label: Text("بري (40 يوم)"), icon: Icon(Icons.local_shipping)),
-                    ],
-                    selected: {shipping},
-                    onSelectionChanged: (s) => setState(() => shipping = s.first),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () async {
-                      final msg = _buildMessage(it);
-                      await shareToWhatsApp(message: msg, imagePath: widget.item.imagePath);
-                      await widget.onChanged(it);
-                    },
-                    icon: const Icon(Icons.send),
-                    label: const Text("إرسال"),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    setState(() => status = ItemStatus.confirmed);
-                    final q = int.tryParse(qtyCtrl.text.trim()) ?? 1;
-                    if (q < 1) qtyCtrl.text = "1";
-                    await widget.onChanged(_currentItem());
-                  },
-                  icon: const Icon(Icons.check_circle_outline),
-                  label: const Text("تأكيد"),
-                ),
-                const SizedBox(width: 10),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    setState(() => status = ItemStatus.cancelled);
-                    await widget.onChanged(_currentItem());
-                  },
-                  icon: const Icon(Icons.cancel_outlined),
-                  label: const Text("إلغاء"),
-                ),
-              ],
-            ),
-            if (status == ItemStatus.confirmed) ...[
-  const SizedBox(height: 10),
-  Row(
-    children: [
-      Expanded(
-        child: TextField(
-          controller: sizeCtrl,
-          decoration: const InputDecoration(labelText: "المقاس"),
-          onChanged: (_) => setState(() {}),
-        ),
-      ),
-      const SizedBox(width: 10),
-
-      // ✅ qty with + / -
-      Expanded(
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: "نقص",
-              onPressed: () {
-                final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
-                final next = (cur - 1) < 1 ? 1 : (cur - 1);
-                setState(() => qtyCtrl.text = next.toString());
-              },
-              icon: const Icon(Icons.remove_circle_outline),
-            ),
-            Expanded(
-              child: TextField(
-                controller: qtyCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "الكمية"),
-                onChanged: (_) => setState(() {}),
-              ),
-            ),
-            IconButton(
-              tooltip: "زيادة",
-              onPressed: () {
-                final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
-                final next = cur + 1;
-                setState(() => qtyCtrl.text = next.toString());
-              },
-              icon: const Icon(Icons.add_circle_outline),
-            ),
-          ],
-        ),
-      ),
-    ],
-  ),
-  const SizedBox(height: 10),
-  Card(
-    color: Colors.grey.shade50,
+  return Card(
+    margin: const EdgeInsets.only(bottom: 12),
     child: Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("إيراد الصنف: ${fmtMoney(revenue)} EGP"),
-          Text("تكلفة الصنف: ${fmtMoney(cost)} EGP"),
-          Text(
-            "الربح الإجمالي: ${fmtMoney(gross)} EGP",
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  File(widget.item.imagePath),
+                  width: 86,
+                  height: 86,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("منتج #${widget.item.id}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 6),
+                    Text("بيع/قطعة: ${fmtMoney(unitSell)} EGP", style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text("شراء/قطعة: ${fmtMoney(unitCost)} EGP"),
+                    Text("مدة الوصول: $days يوم"),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () async => widget.onDelete(widget.item.id!),
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
           ),
+
+          const SizedBox(height: 10),
+          TextField(
+            controller: noteCtrl,
+            decoration: const InputDecoration(labelText: "ملاحظة (اختياري) مثل اسم/وصف المنتج"),
+            onChanged: (_) => setState(() {}),
+          ),
+
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: buySarCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: "سعر الشراء بالريال (Buy SAR)"),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: sellSarCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: "سعر البيع بالريال (Sell SAR)"),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: rateCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: "سعر الريال بالجنيه"),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: extraProfitCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: "ربح إضافي/قطعة (جنيه)"),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: SegmentedButton<ShippingType>(
+                  segments: const [
+                    ButtonSegment(
+                      value: ShippingType.air,
+                      label: Text("جوي (20 يوم)"),
+                      icon: Icon(Icons.flight_takeoff),
+                    ),
+                    ButtonSegment(
+                      value: ShippingType.land,
+                      label: Text("بري (40 يوم)"),
+                      icon: Icon(Icons.local_shipping),
+                    ),
+                  ],
+                  selected: {shipping},
+                  onSelectionChanged: (s) => setState(() => shipping = s.first),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    final msg = _buildMessage(it);
+                    await shareToWhatsApp(message: msg, imagePath: widget.item.imagePath);
+                    await widget.onChanged(it);
+                  },
+                  icon: const Icon(Icons.send),
+                  label: const Text("إرسال"),
+                ),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  setState(() => status = ItemStatus.confirmed);
+                  final q = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+                  if (q < 1) qtyCtrl.text = "1";
+                  await widget.onChanged(_currentItem());
+                },
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text("تأكيد"),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  setState(() => status = ItemStatus.cancelled);
+                  await widget.onChanged(_currentItem());
+                },
+                icon: const Icon(Icons.cancel_outlined),
+                label: const Text("إلغاء"),
+              ),
+            ],
+          ),
+
+          if (status == ItemStatus.confirmed) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: sizeCtrl,
+                    decoration: const InputDecoration(labelText: "المقاس"),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Row(
+                    children: [
+                      IconButton(
+                        tooltip: "نقص",
+                        onPressed: () {
+                          final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+                          final next = (cur - 1) < 1 ? 1 : (cur - 1);
+                          setState(() => qtyCtrl.text = next.toString());
+                        },
+                        icon: const Icon(Icons.remove_circle_outline),
+                      ),
+                      Expanded(
+                        child: TextField(
+                          controller: qtyCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: "الكمية"),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: "زيادة",
+                        onPressed: () {
+                          final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+                          final next = cur + 1;
+                          setState(() => qtyCtrl.text = next.toString());
+                        },
+                        icon: const Icon(Icons.add_circle_outline),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Card(
+              color: Colors.grey.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("إيراد الصنف: ${fmtMoney(revenue)} EGP"),
+                    Text("تكلفة الصنف: ${fmtMoney(cost)} EGP"),
+                    Text(
+                      "الربح الإجمالي: ${fmtMoney(gross)} EGP",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     ),
-  ),
-],
+  );
+}
