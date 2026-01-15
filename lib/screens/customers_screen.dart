@@ -5,6 +5,8 @@ import "orders_screen.dart";
 import "customer_finance_screen.dart";
 import "profit_report_screen.dart";
 import "dashboard_screen.dart";
+import "backups_screen.dart";
+
 
 class CustomersScreen extends StatefulWidget {
   const CustomersScreen({super.key});
@@ -120,21 +122,24 @@ Future<void> _addCustomer() async {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("العملاء"),
-        actions: [
-          // ✅ Dashboard
-          IconButton(
-            icon: const Icon(Icons.dashboard),
-            tooltip: "Dashboard",
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DashboardScreen()),
-              );
-            },
-          ),
+   return Scaffold(
+  appBar: AppBar(
+    title: const Text("العملاء"),
+    actions: [
+      IconButton(
+        icon: const Icon(Icons.backup_outlined),
+        tooltip: "النسخ الاحتياطي",
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const BackupsScreen()),
+          );
+        },
+      ),
+    ],
+  ),
+  body: ...
+);
 
           // ✅ Profit report
           IconButton(
