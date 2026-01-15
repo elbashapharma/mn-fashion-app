@@ -1,6 +1,7 @@
 import "dart:io";
 import "package:flutter/material.dart";
 import "package:image_picker/image_picker.dart";
+
 import "../models.dart";
 import "../repo.dart";
 import "../utils.dart";
@@ -8,7 +9,6 @@ import "../constants.dart";
 import "../whatsapp.dart";
 import "../pdf_export.dart";
 import "../order_export.dart";
-
 
 class OrderDetailScreen extends StatefulWidget {
   final int orderId;
@@ -35,6 +35,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final o = await Repo.instance.getOrder(widget.orderId);
     final c = await Repo.instance.getCustomer(o.customerId);
     final it = await Repo.instance.listItems(widget.orderId);
+
+    if (!mounted) return;
     setState(() {
       order = o;
       customer = c;
@@ -45,6 +47,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Future<void> _setDefaultRate() async {
     final o = order;
     if (o == null) return;
+
     final ctrl = TextEditingController(text: o.defaultRate.toString());
 
     final ok = await showDialog<bool>(
@@ -64,7 +67,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
 
     if (ok == true) {
-      final v = double.tryParse(ctrl.text.trim()) ?? 0;
+      final v = double.tryParse(ctrl.text.trim().replaceAll(",", ".")) ?? 0;
       await Repo.instance.updateOrderDefaultRate(o.id!, v);
       await _load();
     }
@@ -77,11 +80,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     await Repo.instance.markOrderDelivered(o.id!);
     await _load();
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("تم تسجيل الطلب كمُسلّم ✅")),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("تم تسجيل الطلب كمُسلّم ✅")),
+    );
   }
 
   Future<void> _addShippingExpense() async {
@@ -118,7 +120,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
 
     if (ok == true) {
-      final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+      final amount = double.tryParse(amountCtrl.text.trim().replaceAll(",", ".")) ?? 0;
       if (amount <= 0) return;
 
       await Repo.instance.addExpense(
@@ -129,15 +131,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("تم إضافة مصروف الشحن ✅")),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("تم إضافة مصروف الشحن ✅")),
+      );
     }
   }
 
-  // ✅ NEW: تحصيل على نفس الأوردر
   Future<void> _collectPaymentForOrder() async {
     final c = customer;
     final o = order;
@@ -172,27 +172,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
 
     if (ok == true) {
-      final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+      final amount = double.tryParse(amountCtrl.text.trim().replaceAll(",", ".")) ?? 0;
       if (amount <= 0) return;
 
       await Repo.instance.addPayment(
         customerId: c.id!,
-        orderId: o.id!, // ✅ مرتبط بالأوردر
+        orderId: o.id!,
         amountEgp: amount,
         note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("تم تسجيل التحصيل ✅")),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("تم تسجيل التحصيل ✅")),
+      );
     }
   }
 
   Future<void> _addImages() async {
     final List<XFile> picked = await picker.pickMultiImage();
     if (picked.isEmpty) return;
+
     final o = order;
     if (o == null) return;
 
@@ -209,30 +209,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         shipping: ShippingType.air,
         status: ItemStatus.pending,
         size: null,
-        qty: 1, // ✅ مهم جدًا عشان DB NOT NULL
-
+        qty: 1, // ✅ default 1
       );
-     try {
-  await Repo.instance.addItem(newItem);
-} catch (e) {
-  if (mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("خطأ أثناء إضافة الصنف: ${e.toString()}")),
-    );
-  }
-  rethrow;
-}
-
+      await Repo.instance.addItem(newItem);
     }
     await _load();
   }
 
   double _confirmedTotalRevenueEgp() {
-    return items.where((e) => e.status == ItemStatus.confirmed).fold<double>(0, (p, e) => p + e.revenueEgp);
+    return items
+        .where((e) => e.status == ItemStatus.confirmed)
+        .fold<double>(0, (p, e) => p + e.revenueEgp);
   }
 
   double _confirmedTotalGrossProfitEgp() {
-    return items.where((e) => e.status == ItemStatus.confirmed).fold<double>(0, (p, e) => p + e.grossProfitEgp);
+    return items
+        .where((e) => e.status == ItemStatus.confirmed)
+        .fold<double>(0, (p, e) => p + e.grossProfitEgp);
   }
 
   Future<void> _exportPdf() async {
@@ -242,135 +235,135 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     await PdfExporter.exportOrderPdf(customer: c, order: o, items: items);
   }
 
-  @override
-Widget build(BuildContext context) {
-  final o = order;
-  final c = customer;
+  Future<void> _exportHtml() async {
+    final o = order;
+    final c = customer;
+    if (o == null || c == null) return;
 
-  if (o == null || c == null) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    final path = await OrderExporter.exportOrderHtml(customer: c, order: o, items: items);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم تصدير HTML ✅")));
+
+    await OrderExporter.shareFile(path, message: "أمر بيع للعميل: ${c.name} (طلب #${o.id})");
   }
 
-  final confirmed = items.where((e) => e.status == ItemStatus.confirmed).length;
-  final cancelled = items.where((e) => e.status == ItemStatus.cancelled).length;
-  final pending = items.where((e) => e.status == ItemStatus.pending).length;
+  @override
+  Widget build(BuildContext context) {
+    final o = order;
+    final c = customer;
 
-  final totalRevenue = _confirmedTotalRevenueEgp();
-  final totalGrossProfit = _confirmedTotalGrossProfitEgp();
+    if (o == null || c == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-  return Scaffold(
-    appBar: AppBar(
-      title: Text("طلب #${o.id} - ${c.name}"),
-      actions: [
-        IconButton(onPressed: _setDefaultRate, icon: const Icon(Icons.currency_exchange), tooltip: "سعر الريال"),
-        IconButton(onPressed: _addShippingExpense, icon: const Icon(Icons.local_shipping_outlined), tooltip: "مصروف شحن"),
-        IconButton(onPressed: _collectPaymentForOrder, icon: const Icon(Icons.payments), tooltip: "تحصيل"),
-        IconButton(onPressed: _markDelivered, icon: const Icon(Icons.check_circle_outline), tooltip: "تم التسليم"),
-        IconButton(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf), tooltip: "PDF"),
-        IconButton(
-          tooltip: "HTML",
-          icon: const Icon(Icons.description_outlined),
-          onPressed: () async {
-            final path = await OrderExporter.exportOrderHtml(customer: c, order: o, items: items);
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("تم تصدير HTML ✅")),
-            );
-            await OrderExporter.shareFile(path, message: "أمر بيع للعميل: ${c.name} (طلب #${o.id})");
-          },
-        ),
-      ],
-    ),
-    body: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("الزبون: ${c.name}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                  if ((c.whatsapp ?? "").trim().isNotEmpty) Text("واتساب: ${c.whatsapp}"),
-                  if ((c.deliveryAddress ?? "").trim().isNotEmpty) Text("العنوان: ${c.deliveryAddress}"),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 6,
-                    children: [
-                      Chip(label: Text("معلق: $pending")),
-                      Chip(label: Text("مؤكد: $confirmed")),
-                      Chip(label: Text("ملغي: $cancelled")),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "إجمالي الإيرادات (مؤكد): ${fmtMoney(totalRevenue)} EGP",
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "إجمالي الربح الإجمالي (مؤكد): ${fmtMoney(totalGrossProfit)} EGP",
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    o.deliveredAt == null ? "الحالة: غير مُسلّم" : "الحالة: مُسلّم ✅",
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _addImages,
-                          icon: const Icon(Icons.add_photo_alternate),
-                          label: const Text("إضافة صور"),
+    final confirmed = items.where((e) => e.status == ItemStatus.confirmed).length;
+    final cancelled = items.where((e) => e.status == ItemStatus.cancelled).length;
+    final pending = items.where((e) => e.status == ItemStatus.pending).length;
+
+    final totalRevenue = _confirmedTotalRevenueEgp();
+    final totalGrossProfit = _confirmedTotalGrossProfitEgp();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("طلب #${o.id} - ${c.name}"),
+        actions: [
+          IconButton(onPressed: _setDefaultRate, icon: const Icon(Icons.currency_exchange), tooltip: "سعر الريال"),
+          IconButton(onPressed: _addShippingExpense, icon: const Icon(Icons.local_shipping_outlined), tooltip: "مصروف شحن"),
+          IconButton(onPressed: _collectPaymentForOrder, icon: const Icon(Icons.payments), tooltip: "تحصيل"),
+          IconButton(onPressed: _markDelivered, icon: const Icon(Icons.check_circle_outline), tooltip: "تم التسليم"),
+          IconButton(onPressed: _exportPdf, icon: const Icon(Icons.picture_as_pdf), tooltip: "PDF"),
+          IconButton(onPressed: _exportHtml, icon: const Icon(Icons.description_outlined), tooltip: "HTML"),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("الزبون: ${c.name}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                    if ((c.whatsapp ?? "").trim().isNotEmpty) Text("واتساب: ${c.whatsapp}"),
+                    if ((c.deliveryAddress ?? "").trim().isNotEmpty) Text("العنوان: ${c.deliveryAddress}"),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 6,
+                      children: [
+                        Chip(label: Text("معلق: $pending")),
+                        Chip(label: Text("مؤكد: $confirmed")),
+                        Chip(label: Text("ملغي: $cancelled")),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "إجمالي الإيرادات (مؤكد): ${fmtMoney(totalRevenue)} EGP",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "إجمالي الربح الإجمالي (مؤكد): ${fmtMoney(totalGrossProfit)} EGP",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      o.deliveredAt == null ? "الحالة: غير مُسلّم" : "الحالة: مُسلّم ✅",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _addImages,
+                            icon: const Icon(Icons.add_photo_alternate),
+                            label: const Text("إضافة صور"),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      OutlinedButton.icon(
-                        onPressed: _exportPdf,
-                        icon: const Icon(Icons.share),
-                        label: const Text("مشاركة PDF"),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text("سعر الريال الافتراضي: ${o.defaultRate}"),
-                ],
+                        const SizedBox(width: 10),
+                        OutlinedButton.icon(
+                          onPressed: _exportPdf,
+                          icon: const Icon(Icons.share),
+                          label: const Text("مشاركة PDF"),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text("سعر الريال الافتراضي: ${o.defaultRate}"),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        Expanded(
-          child: items.isEmpty
-              ? const Center(child: Text("لا يوجد منتجات بعد. اضغط (إضافة صور)."))
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                  itemCount: items.length,
-                  itemBuilder: (ctx, i) => _ItemCard(
-                    customer: c,
-                    item: items[i],
-                    onChanged: (updated) async {
-                      await Repo.instance.updateItem(updated);
-                      await _load();
-                    },
-                    onDelete: (id) async {
-                      await Repo.instance.deleteItem(id);
-                      await _load();
-                    },
+          Expanded(
+            child: items.isEmpty
+                ? const Center(child: Text("لا يوجد منتجات بعد. اضغط (إضافة صور)."))
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    itemCount: items.length,
+                    itemBuilder: (ctx, i) => _ItemCard(
+                      customer: c,
+                      item: items[i],
+                      onChanged: (updated) async {
+                        await Repo.instance.updateItem(updated);
+                        await _load();
+                      },
+                      onDelete: (id) async {
+                        await Repo.instance.deleteItem(id);
+                        await _load();
+                      },
+                    ),
                   ),
-                ),
-        ),
-      ],
-    ),
-  );
+          ),
+        ],
+      ),
+    );
+  }
 }
-
 
 class _ItemCard extends StatefulWidget {
   final Customer customer;
@@ -431,11 +424,15 @@ class _ItemCardState extends State<_ItemCard> {
     super.dispose();
   }
 
-  double _d(String s) => double.tryParse(s.trim()) ?? 0;
+  double _d(String s) => double.tryParse(s.trim().replaceAll(",", ".")) ?? 0;
   int _i(String s) => int.tryParse(s.trim()) ?? 0;
 
   OrderItem _currentItem() {
     final it = widget.item;
+
+    final q = _i(qtyCtrl.text);
+    final safeQ = q < 1 ? 1 : q;
+
     return it.copyWith(
       note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
       buyPriceSar: _d(buySarCtrl.text),
@@ -445,7 +442,7 @@ class _ItemCardState extends State<_ItemCard> {
       shipping: shipping,
       status: status,
       size: (status == ItemStatus.confirmed && sizeCtrl.text.trim().isNotEmpty) ? sizeCtrl.text.trim() : null,
-      qty: (status == ItemStatus.confirmed) ? (_i(qtyCtrl.text) <= 0 ? 1 : _i(qtyCtrl.text)) : it.qty,
+      qty: (status == ItemStatus.confirmed) ? safeQ : (it.qty ?? 1),
     );
   }
 
@@ -463,263 +460,244 @@ class _ItemCardState extends State<_ItemCard> {
   }
 
   @override
-Widget build(BuildContext context) {
-  final it = _currentItem();
+  Widget build(BuildContext context) {
+    final it = _currentItem();
 
-  final unitSell = (it.priceSar * it.rateEgp) + it.profitEgp;
-  final unitCost = (it.buyPriceSar * it.rateEgp);
+    final unitSell = (it.priceSar * it.rateEgp) + it.profitEgp;
+    final unitCost = (it.buyPriceSar * it.rateEgp);
 
-  final revenue = it.revenueEgp;
-  final cost = it.costEgp;
-  final gross = it.grossProfitEgp;
+    final revenue = it.revenueEgp;
+    final cost = it.costEgp;
+    final gross = it.grossProfitEgp;
 
-  Color statusColor;
-  String statusText;
-  switch (status) {
-    case ItemStatus.confirmed:
-      statusColor = Colors.green;
-      statusText = "مؤكد";
-      break;
-    case ItemStatus.cancelled:
-      statusColor = Colors.red;
-      statusText = "ملغي";
-      break;
-    default:
-      statusColor = Colors.orange;
-      statusText = "معلق";
-  }
+    Color statusColor;
+    String statusText;
+    switch (status) {
+      case ItemStatus.confirmed:
+        statusColor = Colors.green;
+        statusText = "مؤكد";
+        break;
+      case ItemStatus.cancelled:
+        statusColor = Colors.red;
+        statusText = "ملغي";
+        break;
+      default:
+        statusColor = Colors.orange;
+        statusText = "معلق";
+    }
 
-  final days = shipping == ShippingType.air ? AppConstants.shippingDaysAir : AppConstants.shippingDaysLand;
+    final days = shipping == ShippingType.air ? AppConstants.shippingDaysAir : AppConstants.shippingDaysLand;
 
-  return Card(
-    margin: const EdgeInsets.only(bottom: 12),
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.file(
-                  File(widget.item.imagePath),
-                  width: 86,
-                  height: 86,
-                  fit: BoxFit.cover,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(File(widget.item.imagePath), width: 86, height: 86, fit: BoxFit.cover),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("منتج #${widget.item.id}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(999),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("منتج #${widget.item.id}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(color: statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(999)),
+                        child: Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
                       ),
-                      child: Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(height: 6),
-                    Text("بيع/قطعة: ${fmtMoney(unitSell)} EGP", style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text("شراء/قطعة: ${fmtMoney(unitCost)} EGP"),
-                    Text("مدة الوصول: $days يوم"),
-                  ],
+                      const SizedBox(height: 6),
+                      Text("بيع/قطعة: ${fmtMoney(unitSell)} EGP", style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text("شراء/قطعة: ${fmtMoney(unitCost)} EGP"),
+                      Text("مدة الوصول: $days يوم"),
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                onPressed: () async => widget.onDelete(widget.item.id!),
-                icon: const Icon(Icons.delete_outline),
-              ),
-            ],
-          ),
+                IconButton(
+                  onPressed: () async => widget.onDelete(widget.item.id!),
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              ],
+            ),
 
-          const SizedBox(height: 10),
-          TextField(
-            controller: noteCtrl,
-            decoration: const InputDecoration(labelText: "ملاحظة (اختياري) مثل اسم/وصف المنتج"),
-            onChanged: (_) => setState(() {}),
-          ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: noteCtrl,
+              decoration: const InputDecoration(labelText: "ملاحظة (اختياري) مثل اسم/وصف المنتج"),
+              onChanged: (_) => setState(() {}),
+            ),
 
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: buySarCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: "سعر الشراء بالريال (Buy SAR)"),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: sellSarCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: "سعر البيع بالريال (Sell SAR)"),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: rateCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: "سعر الريال بالجنيه"),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: extraProfitCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: "ربح إضافي/قطعة (جنيه)"),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: SegmentedButton<ShippingType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: ShippingType.air,
-                      label: Text("جوي (20 يوم)"),
-                      icon: Icon(Icons.flight_takeoff),
-                    ),
-                    ButtonSegment(
-                      value: ShippingType.land,
-                      label: Text("بري (40 يوم)"),
-                      icon: Icon(Icons.local_shipping),
-                    ),
-                  ],
-                  selected: {shipping},
-                  onSelectionChanged: (s) => setState(() => shipping = s.first),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () async {
-                    final msg = _buildMessage(it);
-                    await shareToWhatsApp(message: msg, imagePath: widget.item.imagePath);
-                    await widget.onChanged(it);
-                  },
-                  icon: const Icon(Icons.send),
-                  label: const Text("إرسال"),
-                ),
-              ),
-              const SizedBox(width: 10),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  setState(() => status = ItemStatus.confirmed);
-                  final q = int.tryParse(qtyCtrl.text.trim()) ?? 1;
-                  if (q < 1) qtyCtrl.text = "1";
-                  await widget.onChanged(_currentItem());
-                },
-                icon: const Icon(Icons.check_circle_outline),
-                label: const Text("تأكيد"),
-              ),
-              const SizedBox(width: 10),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  setState(() => status = ItemStatus.cancelled);
-                  await widget.onChanged(_currentItem());
-                },
-                icon: const Icon(Icons.cancel_outlined),
-                label: const Text("إلغاء"),
-              ),
-            ],
-          ),
-
-          if (status == ItemStatus.confirmed) ...[
             const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
                   child: TextField(
-                    controller: sizeCtrl,
-                    decoration: const InputDecoration(labelText: "المقاس"),
+                    controller: buySarCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: "سعر الشراء بالريال (Buy SAR)"),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Row(
-                    children: [
-                      IconButton(
-                        tooltip: "نقص",
-                        onPressed: () {
-                          final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
-                          final next = (cur - 1) < 1 ? 1 : (cur - 1);
-                          setState(() => qtyCtrl.text = next.toString());
-                        },
-                        icon: const Icon(Icons.remove_circle_outline),
-                      ),
-                      Expanded(
-                        child: TextField(
-                          controller: qtyCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: "الكمية"),
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: "زيادة",
-                        onPressed: () {
-                          final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
-                          final next = cur + 1;
-                          setState(() => qtyCtrl.text = next.toString());
-                        },
-                        icon: const Icon(Icons.add_circle_outline),
-                      ),
-                    ],
+                  child: TextField(
+                    controller: sellSarCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: "سعر البيع بالريال (Sell SAR)"),
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
               ],
             ),
+
             const SizedBox(height: 10),
-            Card(
-              color: Colors.grey.shade50,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("إيراد الصنف: ${fmtMoney(revenue)} EGP"),
-                    Text("تكلفة الصنف: ${fmtMoney(cost)} EGP"),
-                    Text(
-                      "الربح الإجمالي: ${fmtMoney(gross)} EGP",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: rateCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: "سعر الريال بالجنيه"),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: extraProfitCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: "ربح إضافي/قطعة (جنيه)"),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: SegmentedButton<ShippingType>(
+                    segments: const [
+                      ButtonSegment(value: ShippingType.air, label: Text("جوي (20 يوم)"), icon: Icon(Icons.flight_takeoff)),
+                      ButtonSegment(value: ShippingType.land, label: Text("بري (40 يوم)"), icon: Icon(Icons.local_shipping)),
+                    ],
+                    selected: {shipping},
+                    onSelectionChanged: (s) => setState(() => shipping = s.first),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      final msg = _buildMessage(it);
+                      await shareToWhatsApp(message: msg, imagePath: widget.item.imagePath);
+                      await widget.onChanged(it);
+                    },
+                    icon: const Icon(Icons.send),
+                    label: const Text("إرسال"),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    setState(() => status = ItemStatus.confirmed);
+                    final q = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+                    if (q < 1) qtyCtrl.text = "1";
+                    await widget.onChanged(_currentItem());
+                  },
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text("تأكيد"),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    setState(() => status = ItemStatus.cancelled);
+                    await widget.onChanged(_currentItem());
+                  },
+                  icon: const Icon(Icons.cancel_outlined),
+                  label: const Text("إلغاء"),
+                ),
+              ],
+            ),
+
+            if (status == ItemStatus.confirmed) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: sizeCtrl,
+                      decoration: const InputDecoration(labelText: "المقاس"),
+                      onChanged: (_) => setState(() {}),
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        IconButton(
+                          tooltip: "نقص",
+                          onPressed: () {
+                            final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+                            final next = (cur - 1) < 1 ? 1 : (cur - 1);
+                            setState(() => qtyCtrl.text = next.toString());
+                          },
+                          icon: const Icon(Icons.remove_circle_outline),
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: qtyCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: "الكمية"),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: "زيادة",
+                          onPressed: () {
+                            final cur = int.tryParse(qtyCtrl.text.trim()) ?? 1;
+                            final next = cur + 1;
+                            setState(() => qtyCtrl.text = next.toString());
+                          },
+                          icon: const Icon(Icons.add_circle_outline),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Card(
+                color: Colors.grey.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("إيراد الصنف: ${fmtMoney(revenue)} EGP"),
+                      Text("تكلفة الصنف: ${fmtMoney(cost)} EGP"),
+                      Text("الربح الإجمالي: ${fmtMoney(gross)} EGP", style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
