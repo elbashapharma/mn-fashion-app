@@ -1,5 +1,6 @@
 enum ShippingType { air, land }
 enum ItemStatus { pending, confirmed, cancelled }
+enum OrderStatus { pending, confirmed, merged, cancelled }
 
 class Customer {
   final int? id;
@@ -41,37 +42,46 @@ class OrderHeader {
   final double defaultRate;
   final DateTime? deliveredAt;
 
+  // ✅ NEW
+  final OrderStatus status;
+  final int? mergedIntoOrderId;
+
   OrderHeader({
     this.id,
     required this.customerId,
     required this.createdAt,
     required this.defaultRate,
     this.deliveredAt,
-    enum OrderStatus { pending, confirmed, merged, cancelled }
+    this.status = OrderStatus.pending,
+    this.mergedIntoOrderId,
   });
 
   static OrderStatus _orderStatusFrom(String s) {
-  switch (s) {
-    case "confirmed":
-      return OrderStatus.confirmed;
-    case "merged":
-      return OrderStatus.merged;
-    case "cancelled":
-      return OrderStatus.cancelled;
-    default:
-      return OrderStatus.pending;
+    switch (s) {
+      case "confirmed":
+        return OrderStatus.confirmed;
+      case "merged":
+        return OrderStatus.merged;
+      case "cancelled":
+        return OrderStatus.cancelled;
+      default:
+        return OrderStatus.pending;
+    }
   }
+
+  static OrderHeader fromMap(Map<String, Object?> m) => OrderHeader(
+        id: (m["id"] as num?)?.toInt(),
+        customerId: (m["customer_id"] as num).toInt(),
+        createdAt: DateTime.fromMillisecondsSinceEpoch((m["created_at"] as num).toInt()),
+        defaultRate: (m["default_rate"] as num).toDouble(),
+        deliveredAt: m["delivered_at"] == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch((m["delivered_at"] as num).toInt()),
+        status: _orderStatusFrom((m["status"] as String?) ?? "pending"),
+        mergedIntoOrderId: (m["merged_into_order_id"] as num?)?.toInt(),
+      );
 }
 
-static OrderHeader fromMap(Map<String, Object?> m) => OrderHeader(
-  id: m["id"] as int?,
-  customerId: m["customer_id"] as int,
-  createdAt: DateTime.fromMillisecondsSinceEpoch(m["created_at"] as int),
-  defaultRate: (m["default_rate"] as num).toDouble(),
-  deliveredAt: (m["delivered_at"] == null) ? null : DateTime.fromMillisecondsSinceEpoch(m["delivered_at"] as int),
-  status: _orderStatusFrom((m["status"] as String?) ?? "pending"),
-  mergedIntoOrderId: (m["merged_into_order_id"] as num?)?.toInt(),
-);
 
 class OrderItem {
   final int? id;
