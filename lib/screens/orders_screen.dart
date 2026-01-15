@@ -14,6 +14,7 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   Customer? customer;
   List<OrderHeader> orders = [];
+  bool loading = true;
 
   @override
   void initState() {
@@ -22,24 +23,56 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Future<void> _load() async {
+    setState(() => loading = true);
+
     final c = await Repo.instance.getCustomer(widget.customerId);
     final o = await Repo.instance.listOrdersForCustomer(widget.customerId);
+
+    if (!mounted) return;
     setState(() {
       customer = c;
       orders = o;
+      loading = false;
     });
+  }
+
+  String _fmtRate(num? v) {
+    final x = (v ?? 0).toDouble();
+    // 2 decimals max without intl
+    final s = x.toStringAsFixed(2);
+    // remove trailing .00
+    return s.endsWith(".00") ? s.substring(0, s.length - 3) : s;
+  }
+
+  String _fmtDate(dynamic createdAt) {
+    // لو createdAt عندك String في DB زي "2026-01-15 12:30"
+    // نعرضها بشكل لطيف بدون intl
+    final s = (createdAt ?? "").toString().trim();
+    if (s.isEmpty) return "-";
+
+    // حاول parse ISO
+    final dt = DateTime.tryParse(s.replaceAll(" ", "T"));
+    if (dt == null) return s;
+
+    String two(int n) => n.toString().padLeft(2, "0");
+    return "${dt.year}-${two(dt.month)}-${two(dt.day)}  ${two(dt.hour)}:${two(dt.minute)}";
   }
 
   Future<void> _newOrder() async {
     final rateCtrl = TextEditingController(text: "0");
     final ok = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: const Text("طلب جديد"),
         content: TextField(
           controller: rateCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: "سعر الريال الافتراضي (يمكن تغييره لكل منتج)"),
+          textDirection: TextDirection.ltr, // مهم عشان الأرقام ما تتقلبش
+          decoration: const InputDecoration(
+            labelText: "سعر الريال الافتراضي (يمكن تغييره لكل منتج)",
+            hintText: "مثال: 13.5",
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("إلغاء")),
@@ -47,11 +80,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ],
       ),
     );
+
     if (ok == true) {
-      final rate = double.tryParse(rateCtrl.text.trim()) ?? 0;
+      final rate = double.tryParse(rateCtrl.text.trim().replaceAll(",", ".")) ?? 0;
+
       final id = await Repo.instance.createOrder(widget.customerId, rate);
+
       if (!mounted) return;
-      await Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: id)));
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: id)),
+      );
+
       await _load();
     }
   }
@@ -59,25 +99,44 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final c = customer;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(c == null ? "الطلبات" : "الطلبات - ${c.name}"),
+        actions: [
+          IconButton(
+            tooltip: "تحديث",
+            onPressed: _load,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
-      body: ListView.separated(
-        itemCount: orders.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (ctx, i) {
-          final o = orders[i];
-          return ListTile(
-            title: Text("طلب #${o.id}"),
-            subtitle: Text("تاريخ: ${o.createdAt}  |  سعر الريال: ${o.defaultRate}"),
-            onTap: () async {
-              await Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: o.id!)));
-              await _load();
-            },
-          );
-        },
-      ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : orders.isEmpty
+              ? const Center(child: Text("لا توجد طلبات بعد"))
+              : ListView.separated(
+                  itemCount: orders.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (ctx, i) {
+                    final o = orders[i];
+                    return ListTile(
+                      title: Text("طلب #${o.id ?? "-"}"),
+                      subtitle: Text(
+                        "تاريخ: ${_fmtDate(o.createdAt)}  |  سعر الريال: ${_fmtRate(o.defaultRate)}",
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () async {
+                        if (o.id == null) return;
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: o.id!)),
+                        );
+                        await _load();
+                      },
+                    );
+                  },
+                ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _newOrder,
         icon: const Icon(Icons.add),
